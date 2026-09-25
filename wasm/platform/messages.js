@@ -263,13 +263,33 @@ function handleMessage(msg) {
     isStreamSessionActive = false;
     // Show a termination snackbar message if the termination was unexpected
     var errorCode = parseInt(msg.replace('streamTerminated: ', ''));
+    // A stream Auto-Tune ended to start it again, with a lower bitrate or another codec
+    var restart = pendingStreamRestart;
+    pendingStreamRestart = null;
     // Close the statistics of the session, which keeps it in the session history
-    finishStreamStatistics(errorCode);
+    finishStreamStatistics(errorCode, !!restart);
     currentStreamConfig = null;
     // Release the audio scheduler of the Web Audio backend, which is a no-op for the EMSS backend
     stopAudioScheduler();
     // Remove the on-screen overlays
     $('#connection-warnings').css('display', 'none');
+    if (restart) {
+      // Stay on the stream screen and start the stream again once the WASM module is ready
+      $('#wasm_module').css('display', 'none');
+      $('body').css('backgroundColor', '#282C38');
+      $('#loadingSpinner').css('display', 'inline-block');
+      $('#loadingSpinnerMessage').text(restart.message);
+      $('#loadingSpinnerDetail').text('');
+      var restartToken = streamStartToken;
+      setTimeout(function() {
+        // Unless the user cancelled the restart with the RED key in the meantime
+        if (restartToken === streamStartToken) {
+          startGame(restart.host, restart.appId, restart.overrides || {});
+        }
+      }, 500);
+      return;
+    }
+    AutoTune.endReconnectSequence();
     // Remove the video stream now
     $('#listener').removeClass('fullscreen');
     $('#loadingSpinner').css('display', 'none');
@@ -324,7 +344,12 @@ function handleMessage(msg) {
   } else if (msg.indexOf('DecoderSetupFailed: ') === 0) {
     // Explain which decoder the TV could not open instead of the generic stage failure
     decoderSetupErrorShown = true;
-    warningDialog(t('Unsupported Stream Format'), describeDecoderSetupFailure(msg.replace('DecoderSetupFailed: ', '')));
+    var failure = msg.replace('DecoderSetupFailed: ', '');
+    // Auto-Tune picks another codec by itself when the one it chose cannot be decoded
+    if (handleAutoTuneDecoderFailure(failure)) {
+      return;
+    }
+    warningDialog(t('Unsupported Stream Format'), describeDecoderSetupFailure(failure));
   } else if (msg.indexOf('StatsJson: ') === 0) {
     // Statistics of the last second of the stream
     StreamSessionStats.onSample(StreamStats.parseSample(msg.substring('StatsJson: '.length)));

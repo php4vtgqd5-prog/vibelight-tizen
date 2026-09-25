@@ -1444,3 +1444,92 @@ button.setting-control {
         transform: translateX(-100%);
     }
 }
+/* =============================
+   Auto-Tune
+============================= */
+.autotune-notice {
+    display: none;
+    align-items: center;
+    margin: 25px 25px 5px 25px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: rgba(124, 77, 255, 0.14);
+    border: 1px solid rgba(124, 77, 255, 0.45);
+    color: #ececec;
+    font-size: 1.35rem;
+    line-height: 1.45;
+}
+.autotune-notice .material-icons {
+    flex: none;
+    margin-right: 14px;
+    color: #b388ff;
+}
+.setting-option-dimmed {
+    opacity: 0.55;
+}
+.autotune-dialog {
+    width: 62%;
+}
+.autotune-section {
+    margin-bottom: 14px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+}
+.autotune-section-title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 1.55rem;
+    font-weight: 600;
+}
+.autotune-section-title .material-icons {
+    margin-right: 12px;
+    color: #b388ff;
+}
+.autotune-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.3rem;
+    line-height: 1.8;
+}
+.autotune-label {
+    margin-right: 24px;
+    color: rgba(255, 255, 255, 0.65);
+}
+.autotune-value {
+    font-weight: 500;
+    text-align: right;
+}
+.autotune-recommendation {
+    margin: 10px 0 6px 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(0, 163, 198, 0.16);
+    border: 1px solid rgba(0, 163, 198, 0.5);
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+.autotune-reasons {
+    margin: 6px 0 0 0;
+    padding-left: 22px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 1.2rem;
+    line-height: 1.6;
+}
+.autotune-pending {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.3rem;
+}
+.autotune-error {
+    color: #ff6b6b;
+    font-size: 1.3rem;
+}
+#loadingSpinnerDetail {
+    margin: -18px 35px 0 35px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 1.45rem;
+    letter-spacing: 0.4px;
+    text-align: center;
+}

@@ -1972,7 +1972,8 @@ function createSelectMenuView(menuContainerId, buttonId) {
   };
 }
 
-// View of a dialog with a row of buttons, where the BACK key clicks the given button
+// View of a dialog with a row of buttons, listed from left to right as they appear on screen (the
+// actions of a dialog are laid out in reverse order of the markup), where BACK clicks the given one
 function createDialogView(buttonIds, backButtonId) {
   return {
     view: new ListView(() => buttonIds),
@@ -2020,6 +2021,16 @@ Views.SelectStatsOverlayMenu = createSelectMenuView('statsOverlayMenu', 'selectS
 Views.SelectStatsPositionMenu = createSelectMenuView('statsPositionMenu', 'selectStatsPosition');
 Views.SessionSummaryDialog = createDialogView(['closeSessionSummary'], 'closeSessionSummary');
 Views.SessionHistoryDialog = createDialogView(['clearSessionHistory', 'closeSessionHistory'], 'closeSessionHistory');
+Views.AutoTuneSettings = createSettingsCategoryView(() => [
+  'autoTuneBtn',
+  'selectAutoTuneGoal',
+  'autoTuneLearnBtn',
+  'adaptiveReconnectBtn',
+  'runAutoTuneBtn',
+  'resetAutoTuneBtn'
+]);
+Views.SelectAutoTuneGoalMenu = createSelectMenuView('autoTuneGoalMenu', 'selectAutoTuneGoal');
+Views.AutoTuneDialog = createDialogView(['applyAutoTune', 'closeAutoTune'], 'closeAutoTune');
 
 const Navigation = (function() {
   let hasFocus = false;

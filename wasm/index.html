@@ -61,6 +61,10 @@
         <!-- Left Pane: Settings Categories -->
         <div id="settings-left-pane">
           <div class="settings-categories">
+            <div class="settings-category" data-category="autoTuneSettings" onclick="handleSettingsView('autoTuneSettings')">
+              <i class="settings-category-icons material-icons">auto_fix_high</i>
+              <label data-i18n="Auto-Tune">Auto-Tune</label>
+            </div>
             <div class="settings-category" data-category="basicSettings" onclick="handleSettingsView('basicSettings')">
               <i class="settings-category-icons material-icons">tune</i>
               <label data-i18n="Basic Settings">Basic Settings</label>
@@ -101,7 +105,99 @@
         </div>
         <!-- Right Pane: Settings Options -->
         <div id="settings-right-pane">
+          <div id="autoTuneSettings" class="settings-options">
+            <div class="setting-option">
+              <label><span data-i18n="Automatic stream settings">Automatic stream settings</span>
+                <span class="badge badge-new" data-i18n="New">New</span>
+              </label>
+              <span class="mdl-list__item-text-body" data-i18n="- Auto-Tune chooses the resolution, frame rate, bitrate and codec of every stream from what your TV, your host and your network can handle.">
+                - Auto-Tune chooses the resolution, frame rate, bitrate and codec of every stream from what your TV, your host and your network can handle.
+              </span>
+              <div id="autoTuneMenu">
+                <label id="autoTuneBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="autoTuneSwitch">
+                  <input type="checkbox" id="autoTuneSwitch" class="mdl-switch__input">
+                  <span class="mdl-switch__label" data-i18n="Let Auto-Tune choose the best stream settings for each host">
+                    Let Auto-Tune choose the best stream settings for each host
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div id="autoTuneGoalOption" class="setting-option">
+              <label data-i18n="Optimization goal">Optimization goal</label>
+              <span class="mdl-list__item-text-body" data-i18n="- Balanced suits most games, Best quality favors resolution and bitrate, Lowest latency favors frame rate and response time.">
+                - Balanced suits most games, Best quality favors resolution and bitrate, Lowest latency favors frame rate and response time.
+              </span>
+              <div id="autoTuneGoalMenu">
+                <button type="button" id="selectAutoTuneGoal" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="balanced" data-select-menu="autoTuneGoalMenu" data-i18n="Balanced">Balanced</button>
+              </div>
+              <ul class="autoTuneGoalMenu setting-menu mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="selectAutoTuneGoal">
+                <li class="mdl-menu__item" data-value="balanced" data-i18n="Balanced">Balanced</li>
+                <li class="mdl-menu__item" data-value="quality" data-i18n="Best quality">Best quality</li>
+                <li class="mdl-menu__item" data-value="latency" data-i18n="Lowest latency">Lowest latency</li>
+              </ul>
+            </div>
+            <div id="autoTuneLearnOption" class="setting-option">
+              <label data-i18n="Learn from sessions">Learn from sessions</label>
+              <span class="mdl-list__item-text-body" data-i18n="- Uses the statistics of your sessions to find the highest bitrate your network sustains with each host.">
+                - Uses the statistics of your sessions to find the highest bitrate your network sustains with each host.
+              </span>
+              <div id="autoTuneLearnMenu">
+                <label id="autoTuneLearnBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="autoTuneLearnSwitch">
+                  <input type="checkbox" id="autoTuneLearnSwitch" class="mdl-switch__input">
+                  <span class="mdl-switch__label" data-i18n="Adapt the bitrate of each host after every session">
+                    Adapt the bitrate of each host after every session
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div id="adaptiveReconnectOption" class="setting-option">
+              <label data-i18n="Adaptive reconnect">Adaptive reconnect</label>
+              <span class="mdl-list__item-text-body" data-i18n="- When the connection stays poor for several seconds, reconnects with a lower bitrate (at most twice per session).">
+                - When the connection stays poor for several seconds, reconnects with a lower bitrate (at most twice per session).
+              </span>
+              <div id="adaptiveReconnectMenu">
+                <label id="adaptiveReconnectBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="adaptiveReconnectSwitch">
+                  <input type="checkbox" id="adaptiveReconnectSwitch" class="mdl-switch__input">
+                  <span class="mdl-switch__label" data-i18n="Lower the bitrate automatically when the stream struggles">
+                    Lower the bitrate automatically when the stream struggles
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div class="setting-option">
+              <label data-i18n="Test my setup">Test my setup</label>
+              <span class="mdl-list__item-text-body" data-i18n="- Checks your TV and measures the connection to your hosts, then shows the settings Auto-Tune recommends.">
+                - Checks your TV and measures the connection to your hosts, then shows the settings Auto-Tune recommends.
+              </span>
+              <div id="runAutoTuneMenu">
+                <button type="button" id="runAutoTuneBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Test my setup">
+                  <span data-i18n="Run the Auto-Tune test now">
+                    Run the Auto-Tune test now
+                  </span>
+                  <i class="material-icons setting-control-icon">speed</i>
+                </button>
+              </div>
+            </div>
+            <div class="setting-option">
+              <label data-i18n="Reset what Auto-Tune learned">Reset what Auto-Tune learned</label>
+              <span class="mdl-list__item-text-body" data-i18n="- Useful after changing your router, network cables or the place of your TV.">
+                - Useful after changing your router, network cables or the place of your TV.
+              </span>
+              <div id="resetAutoTuneMenu">
+                <button type="button" id="resetAutoTuneBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Reset Auto-Tune">
+                  <span data-i18n="Forget the learned bitrates of all hosts">
+                    Forget the learned bitrates of all hosts
+                  </span>
+                  <i class="material-icons setting-control-icon">restart_alt</i>
+                </button>
+              </div>
+            </div>
+          </div>
           <div id="basicSettings" class="settings-options">
+            <div class="autotune-notice">
+              <i class="material-icons">auto_fix_high</i>
+              <span data-i18n="Auto-Tune is on: it chooses these settings for every stream. They apply when Auto-Tune is off.">Auto-Tune is on: it chooses these settings for every stream. They apply when Auto-Tune is off.</span>
+            </div>
             <div class="setting-option">
               <label data-i18n="Video resolution">Video resolution</label>
               <span class="mdl-list__item-text-body" data-i18n="- Increase to improve image clarity or decrease for better performance on lower-end devices and slower networks.">
@@ -350,6 +446,10 @@
             </div>
           </div>
           <div id="videoSettings" class="settings-options">
+            <div class="autotune-notice">
+              <i class="material-icons">auto_fix_high</i>
+              <span data-i18n="Auto-Tune is on: it chooses the video codec for every stream and turns HDR off when a device does not support it.">Auto-Tune is on: it chooses the video codec for every stream and turns HDR off when a device does not support it.</span>
+            </div>
             <div class="setting-option">
               <label data-i18n="Video codec">Video codec</label>
               <span class="mdl-list__item-text-body" data-i18n="- Increase for better video compression and quality or decrease to improve performance on lower-end devices.">
@@ -575,6 +675,7 @@
       </div>
       <div id="loadingSpinner" class="mdl-progress mdl-js-progress mdl-progress__indeterminate">
         <h4 id="loadingSpinnerMessage"></h4>
+        <p id="loadingSpinnerDetail"></p>
       </div>
     </main>
     <div id="connection-warnings"></div>
@@ -590,6 +691,8 @@
   <script type="text/javascript" src="platform/audio.js"></script>
   <script type="text/javascript" src="platform/stats-core.js"></script>
   <script type="text/javascript" src="platform/stats.js"></script>
+  <script type="text/javascript" src="platform/autotune-core.js"></script>
+  <script type="text/javascript" src="platform/autotune.js"></script>
   <script type="text/javascript" src="platform/index.js"></script>
   <script type="text/javascript" src="platform/navigation.js"></script>
   <script type="text/javascript" src="platform/remote_controller.js"></script>
@@ -858,6 +961,16 @@
       </div>
     </dialog>
   </div>
+  <div id="autoTuneDialogOverlay" class="dialog-overlay">
+    <dialog id="autoTuneDialog" class="mdl-dialog large-dialog autotune-dialog">
+      <h3 id="autoTuneDialogTitle" class="mdl-dialog__title" data-i18n="Auto-Tune">Auto-Tune</h3>
+      <div id="autoTuneContent" class="mdl-dialog__content"></div>
+      <div class="mdl-dialog__actions">
+        <button type="button" id="closeAutoTune" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Close">Close</button>
+        <button type="button" id="applyAutoTune" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Apply to manual settings">Apply to manual settings</button>
+      </div>
+    </dialog>
+  </div>
   <div id="sessionSummaryDialogOverlay" class="dialog-overlay">
     <dialog id="sessionSummaryDialog" class="mdl-dialog summary-dialog">
       <h3 id="sessionSummaryDialogTitle" class="mdl-dialog__title" data-i18n="Session Summary">Session Summary</h3>
@@ -872,8 +985,8 @@
       <h3 id="sessionHistoryDialogTitle" class="mdl-dialog__title" data-i18n="Session History">Session History</h3>
       <div id="sessionHistoryContent" class="mdl-dialog__content"></div>
       <div class="mdl-dialog__actions">
-        <button type="button" id="clearSessionHistory" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Clear history">Clear history</button>
         <button type="button" id="closeSessionHistory" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Close">Close</button>
+        <button type="button" id="clearSessionHistory" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Clear history">Clear history</button>
       </div>
     </dialog>
   </div>

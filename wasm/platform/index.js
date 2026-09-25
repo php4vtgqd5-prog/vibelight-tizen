@@ -131,6 +131,7 @@ function attachListeners() {
   });
   $('#sessionSummarySwitch').on('click', saveSessionSummary);
   $('#sessionHistoryBtn').on('click', sessionHistoryDialog);
+  attachAutoTuneListeners();
   $('#navigationGuideBtn').on('click', navigationGuideDialog);
   $('#checkUpdatesBtn').on('click', checkForAppUpdates);
   $('#restartAppBtn').on('click', restartAppDialog);
@@ -155,6 +156,7 @@ function attachListeners() {
   registerMenu('selectCodec', Views.SelectCodecMenu);
   registerMenu('selectStatsOverlay', Views.SelectStatsOverlayMenu);
   registerMenu('selectStatsPosition', Views.SelectStatsPositionMenu);
+  registerMenu('selectAutoTuneGoal', Views.SelectAutoTuneGoalMenu);
 
   $(window).resize(fullscreenWasmModule);
 
@@ -1764,6 +1766,9 @@ function handleSettingsView(category) {
 
   // Navigate to the corresponding settings view
   switch (category) {
+    case 'autoTuneSettings': // Navigate to the AutoTuneSettings view
+      navigateSettingsView(Views.AutoTuneSettings);
+      break;
     case 'basicSettings': // Navigate to the BasicSettings view
       navigateSettingsView(Views.BasicSettings);
       break;
@@ -2785,8 +2790,23 @@ function handleOnScreenOverlays() {
   // The statistics overlay is shown by StreamSessionStats when the session starts
 }
 
+// Invalidates the stream start in progress when the user cancels it
+var streamStartToken = 0;
+
+// Cancel a stream that is still being prepared or launched, and return to the Apps view
+function abortStreamStart() {
+  streamStartToken++;
+  console.log('%c[index.js, abortStreamStart]', 'color: green;', 'The stream start was cancelled by the user.');
+  $('#loadingSpinnerMessage').text('');
+  $('#loadingSpinnerDetail').text('');
+  if (api) {
+    returnToAppsAfterStreamFailure(api);
+  }
+}
+
 // Start the given appID. If another app is running, offer to quit it. Otherwise, if the given app is already running, just resume it.
-function startGame(host, appID) {
+// The overrides adjust the configuration of a stream the application restarts by itself, such as an adaptive reconnect.
+function startGame(host, appID, overrides) {
   if (!host || !host.paired) {
     console.error('%c[index.js, startGame]', 'color: green;', 'Error: Attempted to start a game, but the host was not initialized properly! Host object: ', host);
     return;
@@ -2799,8 +2819,14 @@ function startGame(host, appID) {
     startAudioScheduler();
   }
 
+  // Identifies this start, which the user can cancel until the stream runs (see abortStreamStart)
+  var startToken = ++streamStartToken;
+
   // Refresh the server info, because the user might have quit the game
   host.refreshServerInfo().then(function(ret) {
+    if (startToken !== streamStartToken) {
+      return;
+    }
     host.getAppById(appID).then(function(appToStart) {
       if (!appToStart) {
         // The app was removed from the host since the list was loaded
@@ -2863,91 +2889,117 @@ function startGame(host, appID) {
         return;
       }
 
-      // Retrieve all stream configuration options from the Settings view
-      var config = buildStreamConfig();
-      var rikey = generateRemoteInputKey();
-      var rikeyid = generateRemoteInputKeyId();
-      var gamepadMask = getConnectedGamepadMask();
-
-      console.log('%c[index.js, startGame]', 'color: green;', 'startRequest:' + 
-      '\n Host address: ' + host.address + ':' + host.httpPort + 
-      '\n Video resolution: ' + config.width + 'x' + config.height + 
-      '\n Video frame rate: ' + config.fps + ' FPS' + 
-      '\n Video bitrate: ' + config.bitrate + ' Kbps' + 
-      '\n Video frame pacing: ' + config.framePacing + 
-      '\n Optimize game settings: ' + config.optimizeGames + 
-      '\n Rumble feedback: ' + config.rumbleFeedback + 
-      '\n Mouse emulation: ' + config.mouseEmulation + 
-      '\n Flip A/B face buttons: ' + config.flipABfaceButtons + 
-      '\n Flip X/Y face buttons: ' + config.flipXYfaceButtons + 
-      '\n Audio backend: ' + config.audioBackend + 
-      '\n Audio configuration: ' + config.audioConfig + 
-      '\n Audio synchronization: ' + config.audioSync + 
-      '\n Audio jitter buffer: ' + config.audioJitter + ' ms' +
-      '\n Play host audio: ' + config.playHostAudio + 
-      '\n Video codec: ' + config.videoCodec + 
-      '\n Video HDR mode: ' + config.hdrMode + 
-      '\n Full color range: ' + config.fullRange + 
-      '\n Game Mode: ' + config.gameMode + 
-      '\n Disable connection warnings: ' + config.disableWarnings + 
-      '\n Performance statistics: ' + config.performanceStats);
-
-      // Hide on-screen overlays until the streaming session begins
-      $('#connection-warnings').removeClass('is-active').text('');
-
       // Shows a loading message to launch the application and start stream mode
-      currentStreamConfig = config;
+      $('#connection-warnings').removeClass('is-active').text('');
       $('#loadingSpinnerMessage').text(t('Starting %1$s...', appToStart.title));
+      $('#loadingSpinnerDetail').text(AutoTune.isEnabled() ? t('Auto-Tune is checking the connection to %1$s...', host.hostname) : '');
       showStreamMode();
 
-      var mode = config.width + 'x' + config.height + 'x' + config.fps;
-      var surroundAudioInfo = surroundAudioInfoFor(config.audioConfig);
-
-      // Resume the app if it is already running, otherwise launch it
-      var isResume = host.currentGame == appID;
-      var launchRequest = isResume
-        ? host.resumeApp(mode, config.optimizeGames, rikey, rikeyid, config.hdrMode, config.playHostAudio, surroundAudioInfo, gamepadMask)
-        : host.launchApp(appID, mode, config.optimizeGames, rikey, rikeyid, config.hdrMode, config.playHostAudio, surroundAudioInfo, gamepadMask);
-
-      launchRequest.then(function(launchResult) {
-        $xml = $($.parseXML(launchResult.toString()));
-        $root = $xml.find('root');
-        var status_code = $root.attr('status_code');
-        var status_message = $root.attr('status_message');
-        if (status_code != 200) {
-          if (!isResume && status_code == 4294967295 && status_message == 'Invalid') {
-            // Special case handling an audio capture error which GFE doesn't provide any useful status message
-            status_code = 418;
-            status_message = t('Audio capture device is missing. Please reinstall the audio drivers.');
-          }
-          $('#loadingSpinnerMessage').text('');
-          snackbarLogLong('Error %1$s: %2$s', status_code, status_message);
-          returnToAppsAfterStreamFailure(host);
+      // Resolve the stream configuration from the settings, or from Auto-Tune
+      prepareStreamConfig(host, overrides).then(function(config) {
+        if (startToken !== streamStartToken) {
+          // The user cancelled the stream while its configuration was prepared
           return;
         }
-        // Start stream request
-        requestStreamStart(host, appToStart, config, [
-          host.address, host.httpPort, String(config.width), String(config.height), String(config.fps), String(config.bitrate),
-          rikey, rikeyid.toString(), host.appVersion, host.gfeVersion, $root.find('sessionUrl0').text().trim(), host.serverCodecModeSupport,
-          config.framePacing, config.optimizeGames, config.rumbleFeedback, config.mouseEmulation, config.flipABfaceButtons, config.flipXYfaceButtons,
-          config.audioBackend, config.audioConfig, config.audioSync, config.audioJitter, config.playHostAudio, config.videoCodec, config.hdrMode,
-          config.fullRange, config.gameMode, config.disableWarnings, config.performanceStats
-        ]);
-      }, function(failedLaunchApp) {
-        console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to ' + (isResume ? 'resume' : 'launch') + ' app with id: ' + appID + '\n Returned error was: ' + failedLaunchApp + '!');
-        if (isResume) {
-          snackbarLog('Failed to resume %1$s', appToStart.title);
-        } else {
-          snackbarLog('Failed to launch %1$s', appToStart.title);
-        }
-        returnToAppsAfterStreamFailure(host);
+        var rikey = generateRemoteInputKey();
+        var rikeyid = generateRemoteInputKeyId();
+        var gamepadMask = getConnectedGamepadMask();
+        config.appId = appID;
+
+        console.log('%c[index.js, startGame]', 'color: green;', 'startRequest:' + 
+        '\n Host address: ' + host.address + ':' + host.httpPort + 
+        '\n Auto-Tune: ' + (config.autoTuned ? JSON.stringify(config.autoTune) : 'off') +
+        '\n Video resolution: ' + config.width + 'x' + config.height + 
+        '\n Video frame rate: ' + config.fps + ' FPS' + 
+        '\n Video bitrate: ' + config.bitrate + ' Kbps' + 
+        '\n Video frame pacing: ' + config.framePacing + 
+        '\n Optimize game settings: ' + config.optimizeGames + 
+        '\n Rumble feedback: ' + config.rumbleFeedback + 
+        '\n Mouse emulation: ' + config.mouseEmulation + 
+        '\n Flip A/B face buttons: ' + config.flipABfaceButtons + 
+        '\n Flip X/Y face buttons: ' + config.flipXYfaceButtons + 
+        '\n Audio backend: ' + config.audioBackend + 
+        '\n Audio configuration: ' + config.audioConfig + 
+        '\n Audio synchronization: ' + config.audioSync + 
+        '\n Audio jitter buffer: ' + config.audioJitter + ' ms' +
+        '\n Play host audio: ' + config.playHostAudio + 
+        '\n Video codec: ' + config.videoCodec + 
+        '\n Video HDR mode: ' + config.hdrMode + 
+        '\n Full color range: ' + config.fullRange + 
+        '\n Game Mode: ' + config.gameMode + 
+        '\n Disable connection warnings: ' + config.disableWarnings + 
+        '\n Performance statistics: ' + config.performanceStats);
+
+        // Show the settings of the stream while it starts, and scale the video to its resolution
+        currentStreamConfig = config;
+        $('#loadingSpinnerDetail').text((config.autoTuned ? t('Auto-Tune: %1$s', describeStreamConfig(config)) : describeStreamConfig(config)));
+        fullscreenWasmModule();
+
+        var mode = config.width + 'x' + config.height + 'x' + config.fps;
+        var surroundAudioInfo = surroundAudioInfoFor(config.audioConfig);
+
+        // Resume the app if it is already running, otherwise launch it
+        var isResume = host.currentGame == appID;
+        var launchRequest = isResume
+          ? host.resumeApp(mode, config.optimizeGames, rikey, rikeyid, config.hdrMode, config.playHostAudio, surroundAudioInfo, gamepadMask)
+          : host.launchApp(appID, mode, config.optimizeGames, rikey, rikeyid, config.hdrMode, config.playHostAudio, surroundAudioInfo, gamepadMask);
+
+        launchRequest.then(function(launchResult) {
+          if (startToken !== streamStartToken) {
+            // The user cancelled the stream while the host launched the app
+            return;
+          }
+          $xml = $($.parseXML(launchResult.toString()));
+          $root = $xml.find('root');
+          var status_code = $root.attr('status_code');
+          var status_message = $root.attr('status_message');
+          if (status_code != 200) {
+            if (!isResume && status_code == 4294967295 && status_message == 'Invalid') {
+              // Special case handling an audio capture error which GFE doesn't provide any useful status message
+              status_code = 418;
+              status_message = t('Audio capture device is missing. Please reinstall the audio drivers.');
+            }
+            $('#loadingSpinnerMessage').text('');
+            snackbarLogLong('Error %1$s: %2$s', status_code, status_message);
+            returnToAppsAfterStreamFailure(host);
+            return;
+          }
+          // Start stream request
+          requestStreamStart(host, appToStart, config, [
+            host.address, host.httpPort, String(config.width), String(config.height), String(config.fps), String(config.bitrate),
+            rikey, rikeyid.toString(), host.appVersion, host.gfeVersion, $root.find('sessionUrl0').text().trim(), host.serverCodecModeSupport,
+            config.framePacing, config.optimizeGames, config.rumbleFeedback, config.mouseEmulation, config.flipABfaceButtons, config.flipXYfaceButtons,
+            config.audioBackend, config.audioConfig, config.audioSync, config.audioJitter, config.playHostAudio, config.videoCodec, config.hdrMode,
+            config.fullRange, config.gameMode, config.disableWarnings, config.performanceStats
+          ]);
+        }, function(failedLaunchApp) {
+          if (startToken !== streamStartToken) {
+            return;
+          }
+          console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to ' + (isResume ? 'resume' : 'launch') + ' app with id: ' + appID + '\n Returned error was: ' + failedLaunchApp + '!');
+          if (isResume) {
+            snackbarLog('Failed to resume %1$s', appToStart.title);
+          } else {
+            snackbarLog('Failed to launch %1$s', appToStart.title);
+          }
+          returnToAppsAfterStreamFailure(host);
+        });
       });
     });
   }, function(failedRefreshInfo) {
+    if (startToken !== streamStartToken) {
+      return;
+    }
     console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to refresh server info! Returned error was: ' + failedRefreshInfo + ' and failed server was: ' + '\n', host, '\n' + host.toString()); // Logging both object (for console) and toString-ed object (for text logs)
-    // The stream never started, so release the audio context opened for it
-    stopAudioScheduler();
     snackbarLogLong('Failed to connect to %1$s. Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.', host.hostname);
+    if (overrides) {
+      // A restart of the stream failed, so leave the stream screen it was waiting on
+      returnToAppsAfterStreamFailure(host);
+    } else {
+      // The stream never started, so release the audio context opened for it
+      _audPreserveContext = false;
+      stopAudioScheduler();
+    }
   });
 }
 
@@ -3000,7 +3052,10 @@ function surroundAudioInfoFor(audioConfig) {
 function returnToAppsAfterStreamFailure(host) {
   isStreamSessionActive = false;
   currentStreamConfig = null;
+  pendingStreamRestart = null;
   StreamSessionStats.end(0);
+  AutoTune.endReconnectSequence();
+  _audPreserveContext = false;
   stopAudioScheduler();
   showApps(host).then(() => {
     // Scroll to the current game row
@@ -3020,6 +3075,7 @@ function requestStreamStart(host, app, config, startArgs) {
 
   isStreamSessionActive = true;
   decoderSetupErrorShown = false;
+  AutoTune.beginSession();
 
   // Collect the statistics of the session for the overlay, the summary and Auto-Tune
   StreamSessionStats.begin({
@@ -3907,6 +3963,7 @@ function restoreDefaultsSettingsValues() {
   storeData('disableWarnings', defaultDisableWarnings, null);
 
   restoreStatisticsDefaults();
+  restoreAutoTuneDefaults();
 }
 
 function initSamsungKeys() {
@@ -4259,6 +4316,9 @@ function loadUserDataCb() {
 
   console.log('%c[index.js, loadUserDataCb]', 'color: green;', 'Load stored statistics preferences.');
   loadStatisticsSettings();
+
+  console.log('%c[index.js, loadUserDataCb]', 'color: green;', 'Load stored Auto-Tune preferences.');
+  loadAutoTuneSettings();
 }
 
 function loadHTTPCerts() {

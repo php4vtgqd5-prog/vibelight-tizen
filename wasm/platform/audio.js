@@ -57,6 +57,11 @@ var _audTail = null;
 // Counters of the current statistics interval, described in _audLogStatistics()
 var _audStats = null;
 
+// Set while a stream is restarted by the application itself (such as an adaptive reconnect), so
+// the audio context survives the restart: a new one could not start without a key press on
+// devices with an autoplay policy
+var _audPreserveContext = false;
+
 // Reset the counters of the statistics interval
 function _audResetStatistics() {
   _audStats = {
@@ -161,6 +166,16 @@ function _audLogStatistics(force) {
 // Create the audio context and start accepting decoded frames. This must be called from a
 // user gesture handler, as the audio context is otherwise blocked by the autoplay policy.
 function startAudioScheduler() {
+  // Reuse the context kept alive through a restart of the stream
+  var preservedContext = _audPreserveContext && _audContext && _audContext.state !== 'closed' ? _audContext : null;
+  _audPreserveContext = false;
+  if (preservedContext) {
+    _audResetSchedule();
+    _audRunning = true;
+    console.log('%c[audio.js, startAudioScheduler]', 'color: teal;', 'Reusing the audio context kept through the restart of the stream.');
+    return;
+  }
+
   stopAudioScheduler();
 
   var AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
@@ -202,6 +217,16 @@ function startAudioScheduler() {
     ' up to ' + _audContext.destination.maxChannelCount + ' output channels.');
 }
 
+// Reset the schedule of the frames, for a new stream played through the same audio context
+function _audResetSchedule() {
+  _audNextTime = 0.0;
+  _audStreamRate = 0;
+  _audRatio = 1.0;
+  _audPhase = 0.0;
+  _audTail = null;
+  _audResetStatistics();
+}
+
 // Stop accepting decoded frames and release the audio context
 function stopAudioScheduler() {
   if (_audContext && _audStats) {
@@ -215,6 +240,11 @@ function stopAudioScheduler() {
   _audPhase = 0.0;
   _audTail = null;
   _audStats = null;
+
+  // Keep the context open while the stream restarts, startAudioScheduler() reuses it
+  if (_audPreserveContext) {
+    return;
+  }
 
   if (_audContext) {
     try {

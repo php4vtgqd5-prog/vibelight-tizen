@@ -436,7 +436,8 @@ function saveSessionToHistory(summary) {
 // Handle the end of a stream: keep the session in the history and remember what to show
 var pendingSessionSummary = null;
 
-function finishStreamStatistics(errorCode) {
+// A stream that is restarted by the application is kept in the history, but not summarized
+function finishStreamStatistics(errorCode, isRestart) {
   var summary = StreamSessionStats.end(errorCode);
   if (!summary || !summary.worthKeeping) {
     pendingSessionSummary = null;
@@ -446,7 +447,7 @@ function finishStreamStatistics(errorCode) {
     onStreamSessionFinished(summary);
   }
   saveSessionToHistory(summary);
-  pendingSessionSummary = isSessionSummaryEnabled() ? summary : null;
+  pendingSessionSummary = isSessionSummaryEnabled() && !isRestart ? summary : null;
   return summary;
 }
 
