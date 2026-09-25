@@ -72,6 +72,11 @@ static int s_AudioSequence = 0;
 // Frames the Opus decoder rejected since the last time it was reported
 static int s_AudioDecodeErrors = 0;
 
+// Audio packets dropped to keep the audio in sync, and packets that could not be decoded or
+// played, since the last statistics report. The video thread reads and resets them.
+std::atomic<uint32_t> g_AudioPacketsDropped{0};
+std::atomic<uint32_t> g_AudioErrors{0};
+
 static inline TimeStamp FrameDuration(double samplesPerFrame, double sampleRate) {
   // Calculate the duration of a frame based on the number of samples per frame and the sample rate
   return TimeStamp(samplesPerFrame / sampleRate);
@@ -91,6 +96,7 @@ static void DecodeAndAppendPacket(samsung::wasm::ElementaryMediaTrack* track, sa
   if (decodeLen <= 0) {
     // Reset the buffer contents to zero when decoding fails
     s_DecodeBuffer.assign(s_DecodeBuffer.size(), 0);
+    g_AudioErrors++;
     return;
   }
 
@@ -115,6 +121,7 @@ static void DecodeAndAppendPacket(samsung::wasm::ElementaryMediaTrack* track, sa
     s_pktPts += s_frameDuration;
   } else {
     MoonlightInstance::ClLogMessage("Append audio packet failed\n");
+    g_AudioErrors++;
   }
 
   // Resize decode buffer if it's smaller than the desired size
@@ -139,6 +146,7 @@ static void DecodeAndScheduleFrame(OpusMSDecoder* decoder, const unsigned char* 
 
   // Check if audio decoding failed
   if (decodeLen <= 0) {
+    g_AudioErrors++;
     // Report the rejected packets in batches, as logging every one of them from the audio
     // thread would cost more time than decoding them
     if (++s_AudioDecodeErrors % 100 == 1) {
@@ -323,6 +331,7 @@ void MoonlightInstance::AudDecDecodeAndPlaySample(char* sampleData, int sampleLe
   // Check if audio synchronization is enabled and if packet dropping is necessary to avoid overflow
   if (s_AudioSyncEnabled && ntp + kAudioBufferMargin < s_estimatedAudioEnd) {
     ClLogMessage("Dropping audio packet to avoid overflow: PTS=%.03f NTP=%.03f\n", s_pktPts.count(), ntp.count());
+    g_AudioPacketsDropped++;
     return;
   }
 

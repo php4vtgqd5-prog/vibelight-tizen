@@ -56,9 +56,9 @@ function remoteControllerHandler(e) {
       }
       break;
     case tvKey.KEY_YELLOW:
-      // Toggle performance stats overlay
+      // Switch the statistics overlay to its next mode
       if (isInGame === true) {
-        Module.toggleStats();
+        cycleStatsOverlayMode();
       }
       break;
     default:

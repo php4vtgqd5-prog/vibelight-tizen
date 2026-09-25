@@ -14,7 +14,7 @@ const SyncFunctions = {
   'stopRequest': (...args) => Module.stopStream(...args),
   // no parameters
   'cancelRequest': (...args) => Module.cancelRequest(...args),
-  // no parameters
+  // no parameters, the module answers with a StatsToggle message
   'toggleStats': (...args) => Module.toggleStats(...args),
 };
 
@@ -81,21 +81,6 @@ function replaceKnownStageLabels(text) {
 
 function replaceKnownStatsLabels(text) {
   return text
-    .replace(/Video stream:/g, t('Video stream:'))
-    .replace(/Codec:/g, t('Codec:'))
-    .replace(/Incoming frame rate from network:/g, t('Incoming frame rate from network:'))
-    .replace(/Decoding frame rate:/g, t('Decoding frame rate:'))
-    .replace(/Rendering frame rate:/g, t('Rendering frame rate:'))
-    .replace(/Incoming bitrate from network:/g, t('Incoming bitrate from network:'))
-    .replace(/Host processing latency min\/max\/average:/g, t('Host processing latency min/max/average:'))
-    .replace(/Frames dropped by your network connection:/g, t('Frames dropped by your network connection:'))
-    .replace(/Frames dropped due to network jitter:/g, t('Frames dropped due to network jitter:'))
-    .replace(/Average network latency:/g, t('Average network latency:'))
-    .replace(/\bvariance:/g, t('variance:'))
-    .replace(/\bN\/A\b/g, t('N/A'))
-    .replace(/Average decoding time:/g, t('Average decoding time:'))
-    .replace(/Average frame queue delay:/g, t('Average frame queue delay:'))
-    .replace(/Average rendering time:/g, t('Average rendering time:'))
     .replace(/Slow connection to PC\.\nReduce your bitrate!/g, t('Slow connection to PC.\nReduce your bitrate!'));
 }
 
@@ -261,7 +246,10 @@ function describeDecoderSetupFailure(detail) {
  * @return {void}
  */
 function handleMessage(msg) {
-  console.log('%c[messages.js, handleMessage]', 'color: gray;', 'Message data: ', msg);
+  // The statistics arrive every second, so they are not logged like the other messages
+  if (msg.indexOf('StatsJson: ') !== 0) {
+    console.log('%c[messages.js, handleMessage]', 'color: gray;', 'Message data: ', msg);
+  }
   // If it's a recognized event, notify the appropriate function
   if (msg.indexOf('streamTerminated: ') === 0) {
     // The WASM module closes the media pipeline in the background after reporting the end of the
@@ -273,18 +261,20 @@ function handleMessage(msg) {
       return;
     }
     isStreamSessionActive = false;
+    // Show a termination snackbar message if the termination was unexpected
+    var errorCode = parseInt(msg.replace('streamTerminated: ', ''));
+    // Close the statistics of the session, which keeps it in the session history
+    finishStreamStatistics(errorCode);
     currentStreamConfig = null;
     // Release the audio scheduler of the Web Audio backend, which is a no-op for the EMSS backend
     stopAudioScheduler();
     // Remove the on-screen overlays
-    $('#connection-warnings, #performance-stats').css('display', 'none');
+    $('#connection-warnings').css('display', 'none');
     // Remove the video stream now
     $('#listener').removeClass('fullscreen');
     $('#loadingSpinner').css('display', 'none');
     $('body').css('backgroundColor', '#282C38');
     $('#wasm_module').css('display', 'none');
-    // Show a termination snackbar message if the termination was unexpected
-    var errorCode = parseInt(msg.replace('streamTerminated: ', ''));
     switch (errorCode) {
       case 0: // ML_ERROR_GRACEFUL_TERMINATION
         break;
@@ -307,28 +297,26 @@ function handleMessage(msg) {
         snackbarLogLong('Connection terminated');
         break;
     }
+    // Return to the app list, then show the summary of the session that just ended
+    var returnToApps = function() {
+      showApps(api).then(() => {
+        // Scroll to the current game row
+        Navigation.switch();
+        // Switch to Apps view
+        if (!window.isDialogOpen) {
+          Navigation.change(Views.Apps);
+        }
+        setTimeout(showPendingSessionSummary, 400);
+      });
+    };
     // Refresh the server info to update the current game and app list
     api.refreshServerInfo().then(function(ret) {
       // Return to the app list with new current game
-      showApps(api).then(() => {
-        // Scroll to the current game row
-        Navigation.switch();
-        // Switch to Apps view
-        if (!window.isDialogOpen) {
-          Navigation.change(Views.Apps);
-        }
-      });
+      returnToApps();
     }, function(failedRefreshInfo) {
       console.error('%c[messages.js, handleMessage]', 'color: gray;', 'Error: Failed to refresh server info! Returned error was: ' + failedRefreshInfo + '!');
       // Return to the app list anyway
-      showApps(api).then(() => {
-        // Scroll to the current game row
-        Navigation.switch();
-        // Switch to Apps view
-        if (!window.isDialogOpen) {
-          Navigation.change(Views.Apps);
-        }
-      });
+      returnToApps();
     });
   } else if (msg === 'StreamCleanupDone') {
     // The media pipeline of the previous session is closed, so a new stream can start
@@ -337,7 +325,15 @@ function handleMessage(msg) {
     // Explain which decoder the TV could not open instead of the generic stage failure
     decoderSetupErrorShown = true;
     warningDialog(t('Unsupported Stream Format'), describeDecoderSetupFailure(msg.replace('DecoderSetupFailed: ', '')));
+  } else if (msg.indexOf('StatsJson: ') === 0) {
+    // Statistics of the last second of the stream
+    StreamSessionStats.onSample(StreamStats.parseSample(msg.substring('StatsJson: '.length)));
+    return;
+  } else if (msg === 'StatsToggle') {
+    // The stats shortcut of the keyboard or a gamepad was pressed
+    cycleStatsOverlayMode();
   } else if (msg === 'Connection Established') {
+    StreamSessionStats.connected();
     // Prepare the screen for video stream
     $('#loadingSpinner').css('display', 'none');
     $('body').css('backgroundColor', 'transparent');
@@ -363,32 +359,10 @@ function handleMessage(msg) {
     $('#listener').addClass('fullscreen');
   } else if (msg.indexOf('NoWarningMsg: ') === 0) {
     // Hide the connection warnings overlay
-    $('#connection-warnings').css('background', 'transparent');
-    $('#connection-warnings').text('');
+    $('#connection-warnings').removeClass('is-active').text('');
   } else if (msg.indexOf('WarningMsg: ') === 0) {
     // Show the connection warnings overlay
-    $('#connection-warnings').css('background', 'rgba(0, 0, 0, 0.5)');
-    $('#connection-warnings').text(translateBackendMessage(msg.replace('WarningMsg: ', '')));
-  } else if (msg.indexOf('NoStatMsg: ') === 0) {
-    // Toggle the performance stats switch and save the state
-    if ($('#performanceStatsSwitch').prop('checked')) {
-      $('#performanceStatsBtn')[0].MaterialSwitch.off();
-      savePerformanceStats();
-      $('#performance-stats').css('display', 'none');
-    }
-    // Hide the performance statistics overlay
-    $('#performance-stats').css('background', 'transparent');
-    $('#performance-stats').text('');
-  } else if (msg.indexOf('StatMsg: ') === 0) {
-    // Toggle the performance stats switch and save the state
-    if (!$('#performanceStatsSwitch').prop('checked')) {
-      $('#performanceStatsBtn')[0].MaterialSwitch.on();
-      savePerformanceStats();
-      $('#performance-stats').css('display', 'inline-block');
-    }
-    // Show the performance statistics overlay
-    $('#performance-stats').css('background', 'rgba(0, 0, 0, 0.5)');
-    $('#performance-stats').text(translateBackendMessage(msg.replace('StatMsg: ', '')));
+    $('#connection-warnings').addClass('is-active').text(translateBackendMessage(msg.replace('WarningMsg: ', '')));
   } else if (msg.indexOf('controllerRumble: ') === 0) {
     const eventData = msg.substring('controllerRumble: '.length).split(',');
     const gamepadIdx = parseInt(eventData[0]);

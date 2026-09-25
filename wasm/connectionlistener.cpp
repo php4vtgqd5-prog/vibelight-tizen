@@ -62,6 +62,9 @@ void MoonlightInstance::ClLogMessage(const char* format, ...) {
 }
 
 void MoonlightInstance::ClConnectionStatusUpdate(int connectionStatus) {
+  // Always record the status for the statistics, even when the warnings are disabled
+  g_Instance->m_ConnectionPoor = (connectionStatus == CONN_STATUS_POOR);
+
   if (g_Instance->m_DisableWarningsEnabled == false) {
     switch (connectionStatus) {
       case CONN_STATUS_OKAY:

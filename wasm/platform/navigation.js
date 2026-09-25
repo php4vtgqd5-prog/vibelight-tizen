@@ -1491,8 +1491,7 @@ const Views = {
     view: new ListView(() => [
       'unlockAllFpsBtn',
       'optimizeBitrateBtn',
-      'disableWarningsBtn',
-      'performanceStatsBtn'
+      'disableWarningsBtn'
     ]),
     up: function() {
       this.view.prevOption();
@@ -1897,6 +1896,130 @@ const Views = {
     },
   },
 };
+
+// View of a settings category, which moves between its settings and returns to the categories
+function createSettingsCategoryView(itemsFn) {
+  return {
+    view: new ListView(itemsFn),
+    up: function() {
+      this.view.prevOption();
+      focusElement(this.view.current());
+    },
+    down: function() {
+      this.view.nextOption();
+      focusElement(this.view.current());
+    },
+    left: function() {},
+    right: function() {},
+    accept: function() {
+      clickElement(this.view.current());
+    },
+    back: function() {
+      // Remove focus from the current element before changing the view
+      blurElement(this.view.current());
+      // Reset the current settings view before navigating to the next settings view
+      resetSettingsView();
+      // Navigate to the Settings view and focus the category of this view
+      Navigation.change(Views.Settings);
+      focusElement(Views.Settings.view.current());
+    },
+    press: function() {},
+    switch: function() {
+      focusElement(this.view.current());
+    },
+    enter: function() {
+      mark(this.view.current());
+    },
+    leave: function() {
+      unmark(this.view.current());
+    },
+  };
+}
+
+// View of the options of a selection menu opened from the button with the given ID
+function createSelectMenuView(menuContainerId, buttonId) {
+  return {
+    isActive: () => isPopupMenuActive(menuContainerId),
+    view: new ListView(() =>
+      document.getElementById(menuContainerId)
+      .parentNode.children[3].children[1].children),
+    up: function() {
+      this.view.prevOption();
+    },
+    down: function() {
+      this.view.nextOption();
+    },
+    left: function() {},
+    right: function() {},
+    accept: function() {
+      clickElement(this.view.current());
+      closeActiveVisibleMenu();
+      setTimeout(() => focusElement(buttonId), 250);
+    },
+    back: function() {
+      closePopupMenu(buttonId);
+      closeActiveVisibleMenu();
+      focusElement(buttonId);
+    },
+    press: function() {},
+    switch: function() {},
+    enter: function() {
+      mark(this.view.current());
+    },
+    leave: function() {
+      unmark(this.view.current());
+    },
+  };
+}
+
+// View of a dialog with a row of buttons, where the BACK key clicks the given button
+function createDialogView(buttonIds, backButtonId) {
+  return {
+    view: new ListView(() => buttonIds),
+    up: function() {},
+    down: function() {
+      focusElement(this.view.current());
+    },
+    left: function() {
+      this.view.prev();
+      focusElement(this.view.current());
+    },
+    right: function() {
+      this.view.next();
+      focusElement(this.view.current());
+    },
+    accept: function() {
+      clickElement(this.view.current());
+    },
+    back: function() {
+      resolveElement(backButtonId).click();
+    },
+    press: function() {},
+    switch: function() {
+      focusElement(this.view.current());
+    },
+    enter: function() {
+      this.view.index = Math.max(0, buttonIds.indexOf(backButtonId));
+      mark(this.view.current());
+      setTimeout(() => focusElement(this.view.current()), 100);
+    },
+    leave: function() {
+      unmark(this.view.current());
+      setTimeout(() => blurElement(this.view.current()), 100);
+    },
+  };
+}
+
+Views.StatisticsSettings = createSettingsCategoryView(() => [
+  'selectStatsOverlay',
+  'selectStatsPosition',
+  'sessionSummaryBtn',
+  'sessionHistoryBtn'
+]);
+Views.SelectStatsOverlayMenu = createSelectMenuView('statsOverlayMenu', 'selectStatsOverlay');
+Views.SelectStatsPositionMenu = createSelectMenuView('statsPositionMenu', 'selectStatsPosition');
+Views.SessionSummaryDialog = createDialogView(['closeSessionSummary'], 'closeSessionSummary');
+Views.SessionHistoryDialog = createDialogView(['clearSessionHistory', 'closeSessionHistory'], 'closeSessionHistory');
 
 const Navigation = (function() {
   let hasFocus = false;

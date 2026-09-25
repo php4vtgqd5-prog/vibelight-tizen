@@ -89,6 +89,10 @@
               <i class="settings-category-icons material-icons">layers</i>
               <label data-i18n="Advanced Settings">Advanced Settings</label>
             </div>
+            <div class="settings-category" data-category="statisticsSettings" onclick="handleSettingsView('statisticsSettings')">
+              <i class="settings-category-icons material-icons">insights</i>
+              <label data-i18n="Statistics">Statistics</label>
+            </div>
             <div class="settings-category" data-category="aboutSettings" onclick="handleSettingsView('aboutSettings')">
               <i class="settings-category-icons material-icons">info</i>
               <label data-i18n="About">About</label>
@@ -446,16 +450,66 @@
                 </label>
               </div>
             </div>
+          </div>
+          <div id="statisticsSettings" class="settings-options">
             <div class="setting-option">
-              <label data-i18n="Performance statistics">Performance statistics</label>
-              <span class="mdl-list__item-text-body"></span>
-              <div id="performanceStatsMenu">
-                <label id="performanceStatsBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="performanceStatsSwitch">
-                  <input type="checkbox" id="performanceStatsSwitch" class="mdl-switch__input">
-                  <span class="mdl-switch__label" data-i18n="Display real-time stream performance information while streaming">
-                    Display real-time stream performance information while streaming
+              <label><span data-i18n="Statistics overlay">Statistics overlay</span>
+                <span class="badge badge-new" data-i18n="New">New</span>
+              </label>
+              <span class="mdl-list__item-text-body" data-i18n="- Shows live stream statistics while streaming. Press YELLOW on the remote to switch between the modes at any time.">
+                - Shows live stream statistics while streaming. Press YELLOW on the remote to switch between the modes at any time.
+              </span>
+              <div id="statsOverlayMenu">
+                <button type="button" id="selectStatsOverlay" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="off" data-select-menu="statsOverlayMenu" data-i18n="Off">Off</button>
+              </div>
+              <ul class="statsOverlayMenu setting-menu mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="selectStatsOverlay">
+                <li class="mdl-menu__item" data-value="off" data-i18n="Off">Off</li>
+                <li class="mdl-menu__item" data-value="compact" data-i18n="Compact">Compact</li>
+                <li class="mdl-menu__item" data-value="standard" data-i18n="Standard">Standard</li>
+                <li class="mdl-menu__item" data-value="detailed" data-i18n="Detailed">Detailed</li>
+              </ul>
+            </div>
+            <div class="setting-option">
+              <label data-i18n="Overlay position">Overlay position</label>
+              <span class="mdl-list__item-text-body" data-i18n="- Choose the corner of the screen where the statistics overlay is shown.">
+                - Choose the corner of the screen where the statistics overlay is shown.
+              </span>
+              <div id="statsPositionMenu">
+                <button type="button" id="selectStatsPosition" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="tl" data-select-menu="statsPositionMenu" data-i18n="Top left">Top left</button>
+              </div>
+              <ul class="statsPositionMenu setting-menu mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="selectStatsPosition">
+                <li class="mdl-menu__item" data-value="tl" data-i18n="Top left">Top left</li>
+                <li class="mdl-menu__item" data-value="tr" data-i18n="Top right">Top right</li>
+                <li class="mdl-menu__item" data-value="bl" data-i18n="Bottom left">Bottom left</li>
+                <li class="mdl-menu__item" data-value="br" data-i18n="Bottom right">Bottom right</li>
+              </ul>
+            </div>
+            <div class="setting-option">
+              <label data-i18n="Session summary">Session summary</label>
+              <span class="mdl-list__item-text-body" data-i18n="- After each stream, shows its quality score with the average frame rate, bitrate, latency and frame loss.">
+                - After each stream, shows its quality score with the average frame rate, bitrate, latency and frame loss.
+              </span>
+              <div id="sessionSummaryMenu">
+                <label id="sessionSummaryBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="sessionSummarySwitch">
+                  <input type="checkbox" id="sessionSummarySwitch" class="mdl-switch__input">
+                  <span class="mdl-switch__label" data-i18n="Show a summary of the stream quality when a session ends">
+                    Show a summary of the stream quality when a session ends
                   </span>
                 </label>
+              </div>
+            </div>
+            <div class="setting-option">
+              <label data-i18n="Session history">Session history</label>
+              <span class="mdl-list__item-text-body" data-i18n="- Review the statistics of your last streaming sessions.">
+                - Review the statistics of your last streaming sessions.
+              </span>
+              <div id="sessionHistoryMenu">
+                <button type="button" id="sessionHistoryBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Session History">
+                  <span data-i18n="View the statistics of the last sessions">
+                    View the statistics of the last sessions
+                  </span>
+                  <i class="material-icons setting-control-icon">history</i>
+                </button>
               </div>
             </div>
           </div>
@@ -534,6 +588,8 @@
   <script type="text/javascript" src="platform/common.js"></script>
   <script type="text/javascript" src="platform/gamepad.js"></script>
   <script type="text/javascript" src="platform/audio.js"></script>
+  <script type="text/javascript" src="platform/stats-core.js"></script>
+  <script type="text/javascript" src="platform/stats.js"></script>
   <script type="text/javascript" src="platform/index.js"></script>
   <script type="text/javascript" src="platform/navigation.js"></script>
   <script type="text/javascript" src="platform/remote_controller.js"></script>
@@ -740,7 +796,7 @@
           </li>
           <li class="navGuideDialogControls">
             <span class="navGuideRemoteText" data-i18n="YELLOW">YELLOW</span> / <span class="navGuideKeyboardText" data-i18n="F3">F3</span> / <span class="navGuideKeyboardText" data-i18n="CTRL + ALT + SHIFT + S">CTRL + ALT + SHIFT + S</span> / <span class="navGuideGamepadText" data-i18n="SELECT + LB + RB + X">SELECT + LB + RB + X</span>
-            <span data-i18n="— Toggle the performance statistics overlay.">— Toggle the performance statistics overlay.</span>
+            <span data-i18n="— Switch the statistics overlay between off, compact, standard and detailed.">— Switch the statistics overlay between off, compact, standard and detailed.</span>
           </li>
         </ul>
       </div>
@@ -799,6 +855,25 @@
       <div class="mdl-dialog__actions">
         <button type="button" id="cancelExitApp" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" data-i18n="Cancel">Cancel</button>
         <button type="button" id="continueExitApp" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" data-i18n="Exit">Exit</button>
+      </div>
+    </dialog>
+  </div>
+  <div id="sessionSummaryDialogOverlay" class="dialog-overlay">
+    <dialog id="sessionSummaryDialog" class="mdl-dialog summary-dialog">
+      <h3 id="sessionSummaryDialogTitle" class="mdl-dialog__title" data-i18n="Session Summary">Session Summary</h3>
+      <div id="sessionSummaryContent" class="mdl-dialog__content"></div>
+      <div class="mdl-dialog__actions">
+        <button type="button" id="closeSessionSummary" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-wide-button" data-i18n="Close">Close</button>
+      </div>
+    </dialog>
+  </div>
+  <div id="sessionHistoryDialogOverlay" class="dialog-overlay">
+    <dialog id="sessionHistoryDialog" class="mdl-dialog large-dialog history-dialog">
+      <h3 id="sessionHistoryDialogTitle" class="mdl-dialog__title" data-i18n="Session History">Session History</h3>
+      <div id="sessionHistoryContent" class="mdl-dialog__content"></div>
+      <div class="mdl-dialog__actions">
+        <button type="button" id="clearSessionHistory" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Clear history">Clear history</button>
+        <button type="button" id="closeSessionHistory" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect dialog-half-button" data-i18n="Close">Close</button>
       </div>
     </dialog>
   </div>

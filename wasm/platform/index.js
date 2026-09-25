@@ -123,7 +123,14 @@ function attachListeners() {
   $('#unlockAllFpsSwitch').on('click', saveUnlockAllFps);
   $('#optimizeBitrateSwitch').on('click', saveOptimizeBitrate);
   $('#disableWarningsSwitch').on('click', saveDisableWarnings);
-  $('#performanceStatsSwitch').on('click', savePerformanceStats);
+  $('.statsOverlayMenu li').on('click', function() {
+    applyStatsOverlayMode($(this).data('value'), true);
+  });
+  $('.statsPositionMenu li').on('click', function() {
+    applyStatsOverlayPosition($(this).data('value'), true);
+  });
+  $('#sessionSummarySwitch').on('click', saveSessionSummary);
+  $('#sessionHistoryBtn').on('click', sessionHistoryDialog);
   $('#navigationGuideBtn').on('click', navigationGuideDialog);
   $('#checkUpdatesBtn').on('click', checkForAppUpdates);
   $('#restartAppBtn').on('click', restartAppDialog);
@@ -146,6 +153,8 @@ function attachListeners() {
   registerMenu('selectAudio', Views.SelectAudioMenu);
   registerMenu('selectAudioJitter', Views.SelectAudioJitterMenu);
   registerMenu('selectCodec', Views.SelectCodecMenu);
+  registerMenu('selectStatsOverlay', Views.SelectStatsOverlayMenu);
+  registerMenu('selectStatsPosition', Views.SelectStatsPositionMenu);
 
   $(window).resize(fullscreenWasmModule);
 
@@ -1776,6 +1785,9 @@ function handleSettingsView(category) {
     case 'advancedSettings': // Navigate to the AdvancedSettings view
       navigateSettingsView(Views.AdvancedSettings);
       break;
+    case 'statisticsSettings': // Navigate to the StatisticsSettings view
+      navigateSettingsView(Views.StatisticsSettings);
+      break;
     case 'aboutSettings': // Navigate to the AboutSettings view
       navigateSettingsView(Views.AboutSettings);
       break;
@@ -2766,13 +2778,11 @@ function fullscreenWasmModule() {
 function handleOnScreenOverlays() {
   // Find the existing toggle switch elements
   const disableWarningsSwitch = document.getElementById('disableWarningsSwitch');
-  const performanceStatsSwitch = document.getElementById('performanceStatsSwitch');
 
   // Check if the disable warnings switch is checked, then hide or show the connection warning messages
   disableWarningsSwitch.checked ? $('#connection-warnings').css('display', 'none') : $('#connection-warnings').css('display', 'inline-block');
 
-  // Check if the performance stats switch is checked, then show or hide the performance statistics information
-  performanceStatsSwitch.checked ? $('#performance-stats').css('display', 'inline-block') : $('#performance-stats').css('display', 'none');
+  // The statistics overlay is shown by StreamSessionStats when the session starts
 }
 
 // Start the given appID. If another app is running, offer to quit it. Otherwise, if the given app is already running, just resume it.
@@ -2883,7 +2893,7 @@ function startGame(host, appID) {
       '\n Performance statistics: ' + config.performanceStats);
 
       // Hide on-screen overlays until the streaming session begins
-      $('#connection-warnings, #performance-stats').css('background', 'transparent').text('');
+      $('#connection-warnings').removeClass('is-active').text('');
 
       // Shows a loading message to launch the application and start stream mode
       currentStreamConfig = config;
@@ -2916,7 +2926,7 @@ function startGame(host, appID) {
           return;
         }
         // Start stream request
-        requestStreamStart(host, config, [
+        requestStreamStart(host, appToStart, config, [
           host.address, host.httpPort, String(config.width), String(config.height), String(config.fps), String(config.bitrate),
           rikey, rikeyid.toString(), host.appVersion, host.gfeVersion, $root.find('sessionUrl0').text().trim(), host.serverCodecModeSupport,
           config.framePacing, config.optimizeGames, config.rumbleFeedback, config.mouseEmulation, config.flipABfaceButtons, config.flipXYfaceButtons,
@@ -2969,7 +2979,7 @@ function buildStreamConfig() {
     fullRange: isChecked('fullRangeSwitch'),
     gameMode: isChecked('gameModeSwitch'),
     disableWarnings: isChecked('disableWarningsSwitch'),
-    performanceStats: isChecked('performanceStatsSwitch'),
+    performanceStats: StatsOverlay.getMode() !== 'off' ? 1 : 0,
   };
 }
 
@@ -2990,6 +3000,7 @@ function surroundAudioInfoFor(audioConfig) {
 function returnToAppsAfterStreamFailure(host) {
   isStreamSessionActive = false;
   currentStreamConfig = null;
+  StreamSessionStats.end(0);
   stopAudioScheduler();
   showApps(host).then(() => {
     // Scroll to the current game row
@@ -3002,13 +3013,22 @@ function returnToAppsAfterStreamFailure(host) {
 // Ask the WASM module to start the stream once the previous session is fully torn down. The module
 // refuses to start while it is still closing the media pipeline of the previous session, which it
 // confirms with StreamCleanupDone, so wait for that and retry for a few seconds before giving up.
-function requestStreamStart(host, config, startArgs) {
+function requestStreamStart(host, app, config, startArgs) {
   var STREAM_START_TIMEOUT = 8000;
   var STREAM_START_RETRY_DELAY = 250;
   var startedAt = Date.now();
 
   isStreamSessionActive = true;
   decoderSetupErrorShown = false;
+
+  // Collect the statistics of the session for the overlay, the summary and Auto-Tune
+  StreamSessionStats.begin({
+    hostName: host.hostname,
+    hostUid: host.serverUid,
+    appName: app ? app.title : '',
+    config: config,
+    startedAt: startedAt,
+  });
 
   var attempt = function() {
     if (!isStreamSessionActive) {
@@ -3765,12 +3785,16 @@ function saveDisableWarnings() {
   }, 100);
 }
 
-function savePerformanceStats() {
-  setTimeout(() => {
-    const chosenPerformanceStats = $('#performanceStatsSwitch').parent().hasClass('is-checked');
-    console.log('%c[index.js, savePerformanceStats]', 'color: green;', 'Saving performance stats state: ' + chosenPerformanceStats);
-    storeData('performanceStats', chosenPerformanceStats, null);
-  }, 100);
+// Show the value of a selection menu on its button, and keep the button translatable
+function setSelectMenuValue(buttonId, menuClass, value) {
+  var item = $('.' + menuClass + ' li').filter(function() {
+    return String($(this).data('value')) === String(value);
+  }).first();
+  if (item.length === 0) {
+    return;
+  }
+  var key = item.attr('data-i18n') || item.text().trim();
+  $('#' + buttonId).text(t(key)).attr('data-value', value).data('value', value).attr('data-i18n', key);
 }
 
 // Reset all settings to their default state and save the value data
@@ -3882,9 +3906,7 @@ function restoreDefaultsSettingsValues() {
   document.querySelector('#disableWarningsBtn').MaterialSwitch.off();
   storeData('disableWarnings', defaultDisableWarnings, null);
 
-  const defaultPerformanceStats = false;
-  document.querySelector('#performanceStatsBtn').MaterialSwitch.off();
-  storeData('performanceStats', defaultPerformanceStats, null);
+  restoreStatisticsDefaults();
 }
 
 function initSamsungKeys() {
@@ -4235,16 +4257,8 @@ function loadUserDataCb() {
     }
   });
 
-  console.log('%c[index.js, loadUserDataCb]', 'color: green;', 'Load stored performanceStats preferences.');
-  getData('performanceStats', function(previousValue) {
-    if (previousValue.performanceStats == null) {
-      document.querySelector('#performanceStatsBtn').MaterialSwitch.off(); // Set the default state
-    } else if (previousValue.performanceStats == false) {
-      document.querySelector('#performanceStatsBtn').MaterialSwitch.off();
-    } else {
-      document.querySelector('#performanceStatsBtn').MaterialSwitch.on();
-    }
-  });
+  console.log('%c[index.js, loadUserDataCb]', 'color: green;', 'Load stored statistics preferences.');
+  loadStatisticsSettings();
 }
 
 function loadHTTPCerts() {
