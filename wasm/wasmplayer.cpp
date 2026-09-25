@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "samsung/wasm/elementary_audio_track_config.h"
 #include "samsung/wasm/elementary_media_packet.h"
@@ -27,6 +28,7 @@ using HTMLAsyncResult = samsung::wasm::OperationResult;
 using TimeStamp = samsung::wasm::Seconds;
 
 static constexpr TimeStamp kFrameTimeMargin = 0.5ms;
+static constexpr TimeStamp kPacerSpinThreshold = 1ms;
 static constexpr TimeStamp kTimeWindow = 1s;
 static constexpr uint32_t kSampleRate = 48000;
 
@@ -159,7 +161,8 @@ int MoonlightInstance::StartupVidDecSetup(int videoFormat, int width, int height
   // The Web Audio backend renders the audio itself in platform/audio.js, so the EMSS audio
   // track is only added when the EMSS backend is selected
   if (g_Instance->m_AudioBackend == AudioBackend::Emss) {
-    samsung::wasm::ChannelLayout channelLayout; // Selected audio channel layout from audio config
+    // Selected audio channel layout from audio config, Stereo unless a surround layout matches
+    samsung::wasm::ChannelLayout channelLayout = samsung::wasm::ChannelLayout::kStereo;
     switch (CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(g_Instance->m_AudioConfig)) {
       case 2:
         channelLayout = samsung::wasm::ChannelLayout::kStereo; // Audio Channel: Stereo
@@ -174,7 +177,7 @@ int MoonlightInstance::StartupVidDecSetup(int videoFormat, int width, int height
         ClLogMessage("Selected channel layout for 7.1 Surround audio\n");
         break;
       default:
-        ClLogMessage("Unable to select channel layout from audio configuration\n");
+        ClLogMessage("Unable to select channel layout from audio configuration, using Stereo\n");
         break;
     }
 
@@ -191,6 +194,12 @@ int MoonlightInstance::StartupVidDecSetup(int videoFormat, int width, int height
     if (add_track_result) {
       g_Instance->m_AudioTrack = std::move(*add_track_result);
       g_Instance->m_AudioTrack.SetListener(&g_Instance->m_AudioTrackListener);
+    } else {
+      // Without a track the audio never opens, so waiting for it below would hang the connection
+      ClLogMessage("Failed to add the EMSS audio track for %d channels\n",
+        CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(g_Instance->m_AudioConfig));
+      PostToJs("DecoderSetupFailed: audio:" + std::to_string(CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(g_Instance->m_AudioConfig)));
+      return -1;
     }
   }
 
@@ -241,6 +250,12 @@ int MoonlightInstance::StartupVidDecSetup(int videoFormat, int width, int height
     if (add_track_result) {
       g_Instance->m_VideoTrack = std::move(*add_track_result);
       g_Instance->m_VideoTrack.SetListener(&g_Instance->m_VideoTrackListener);
+    } else {
+      // The TV has no decoder for this codec profile. Without a track the video never opens, so
+      // waiting for it below would leave the connection hanging until the user cancels it.
+      ClLogMessage("Failed to add the EMSS video track for %s\n", mimetype);
+      PostToJs(std::string("DecoderSetupFailed: video:") + mimetype);
+      return -1;
     }
   }
 
@@ -408,11 +423,26 @@ int MoonlightInstance::VidDecSubmitDecodeUnit(PDECODE_UNIT decodeUnit) {
   if (s_FramePacingEnabled) {
     // Calculate the time elapsed since the first frame
     TimeStamp fromStart = now - s_firstAppend;
-    // Wait until the packet timestamp is within the frame time margin
-    while (s_pktPts > fromStart - s_ptsDiff + kFrameTimeMargin) {
+    // Time left until the packet timestamp is within the frame time margin
+    TimeStamp remaining = s_pktPts - (fromStart - s_ptsDiff + kFrameTimeMargin);
+    // Never hold a frame back for longer than two frame durations. A larger gap means the clocks
+    // drifted apart, so realign them instead of adding that much latency to every frame.
+    if (remaining > 2 * s_frameDuration) {
+      s_ptsDiff = fromStart - s_pktPts;
+      remaining = TimeStamp::zero();
+    }
+    // Wait until the packet timestamp is within the frame time margin. Sleep through most of the
+    // wait rather than spinning, which kept a CPU core busy on the thread receiving the video, and
+    // only spin for the last moment to keep the pacing precise.
+    while (remaining > TimeStamp::zero()) {
+      if (remaining > kPacerSpinThreshold) {
+        usleep(static_cast<useconds_t>(
+          std::chrono::duration_cast<std::chrono::microseconds>(remaining - kPacerSpinThreshold).count()));
+      }
       // Update the current time and recalculate the elapsed time
       now = std::chrono::steady_clock::now();
       fromStart = now - s_firstAppend;
+      remaining = s_pktPts - (fromStart - s_ptsDiff + kFrameTimeMargin);
     }
     // Synchronize packet presentation timing every time window
     if (fromStart > s_lastSec + kTimeWindow) {

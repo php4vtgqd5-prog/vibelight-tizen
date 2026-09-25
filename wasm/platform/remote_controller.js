@@ -38,8 +38,8 @@ function remoteControllerHandler(e) {
       tizen.tvaudiocontrol.setVolumeDown();
       break;
     case tvKey.KEY_VOLUME_MUTE:
-      // Mute the volume
-      tizen.tvaudiocontrol.setMute();
+      // Toggle the mute state, as setMute() requires the state to set
+      tizen.tvaudiocontrol.setMute(!tizen.tvaudiocontrol.isMute());
       break;
     case tvKey.KEY_CHANNEL_UP:
       // Triggers the press action

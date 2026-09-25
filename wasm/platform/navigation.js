@@ -94,6 +94,10 @@ function clickElement(target) {
 
 // Mark an element based on various target types
 function mark(target) {
+  // A view can be entered before its items exist, such as the Apps view while the list loads
+  if (target === undefined || target === null) {
+    return;
+  }
   const element = resolveElement(target);
   // Check if the element exists before marking
   if (element) {
@@ -107,6 +111,9 @@ function mark(target) {
 
 // Unmark an element based on various target types
 function unmark(target) {
+  if (target === undefined || target === null) {
+    return;
+  }
   const element = resolveElement(target);
   // Check if the element exists before un-marking
   if (element) {

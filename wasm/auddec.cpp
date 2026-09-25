@@ -202,12 +202,27 @@ int MoonlightInstance::AudDecInit(int audioConfiguration, POPUS_MULTISTREAM_CONF
   // Calculate the frame duration based on the samples per frame (240) and sample rate (48000)
   s_frameDuration = FrameDuration(opusConfig->samplesPerFrame, opusConfig->sampleRate);
 
+  // Release a decoder that a previous session may have left behind
+  if (g_Instance->m_OpusDecoder) {
+    opus_multistream_decoder_destroy(g_Instance->m_OpusDecoder);
+    g_Instance->m_OpusDecoder = NULL;
+  }
+
   // Create the Opus decoder with the provided configuration parameters
   g_Instance->m_OpusDecoder = opus_multistream_decoder_create(
     opusConfig->sampleRate, opusConfig->channelCount,
     opusConfig->streams, opusConfig->coupledStreams,
     opusConfig->mapping, &rc
   );
+  if (g_Instance->m_OpusDecoder == NULL || rc != OPUS_OK) {
+    // Decoding with a missing decoder would crash the audio thread, so fail the audio setup instead
+    ClLogMessage("Failed to create the Opus decoder: %d\n", rc);
+    if (g_Instance->m_OpusDecoder) {
+      opus_multistream_decoder_destroy(g_Instance->m_OpusDecoder);
+      g_Instance->m_OpusDecoder = NULL;
+    }
+    return -1;
+  }
 
   // Initialize the estimated audio end time
   s_estimatedAudioEnd = 0s;
@@ -262,6 +277,13 @@ void MoonlightInstance::AudDecCleanup(void) {
         stopAudioScheduler();
       }
     });
+  }
+
+  // Release the Opus decoder, which used to leak once per streaming session. The audio threads of
+  // moonlight-common-c are stopped before this callback, so nothing decodes with it anymore.
+  if (g_Instance->m_OpusDecoder) {
+    opus_multistream_decoder_destroy(g_Instance->m_OpusDecoder);
+    g_Instance->m_OpusDecoder = NULL;
   }
 
   // Clear the decode buffer

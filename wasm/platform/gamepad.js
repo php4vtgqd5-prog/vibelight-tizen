@@ -76,7 +76,7 @@ const Controller = (function() {
     const gamepads = navigator.getGamepads
       ? navigator.getGamepads()
       : navigator.webkitGetGamepads
-      ? navigator.webkitGetGamepads
+      ? navigator.webkitGetGamepads()
       : [];
     for (const gamepad of gamepads) {
       if (gamepad) {
@@ -85,15 +85,25 @@ const Controller = (function() {
     }
   }
 
+  // Interval between two polls of the gamepads for the user interface, in milliseconds. One poll
+  // per frame is plenty for navigating menus, polling faster only kept the main thread busy.
+  const POLLING_INTERVAL_MS = 16;
+
+  let listenersAttached = false;
+
   function startWatching() {
-    if (!pollingInterval) {
+    // Attach the connection listeners once, even when watching is stopped and started again
+    if (!listenersAttached) {
+      listenersAttached = true;
       window.addEventListener('gamepadconnected', function(e) {
         gamepadConnected(e.gamepad);
       });
       window.addEventListener('gamepaddisconnected', function(e) {
         gamepadDisconnected(e.gamepad);
       });
-      pollingInterval = setInterval(pollGamepads, 5);
+    }
+    if (!pollingInterval) {
+      pollingInterval = setInterval(pollGamepads, POLLING_INTERVAL_MS);
     }
   }
 
@@ -104,8 +114,31 @@ const Controller = (function() {
     }
   }
 
+  // The WASM module polls the gamepads by itself while streaming, so the user interface stops
+  // polling them to leave the main thread to the video and audio of the stream
+  function pause() {
+    stopWatching();
+  }
+
+  function resume() {
+    if (!listenersAttached) {
+      return;
+    }
+    // Take a fresh snapshot of the gamepads, so the buttons held while the stream ended are not
+    // reported as new presses to the user interface
+    const current = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gamepad of current) {
+      if (gamepad && gamepads[gamepad.index]) {
+        gamepads[gamepad.index] = new Gamepad(gamepad);
+      }
+    }
+    startWatching();
+  }
+
   return {
     startWatching,
-    stopWatching 
+    stopWatching,
+    pause,
+    resume
   };
 })();

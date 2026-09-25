@@ -55,6 +55,7 @@ var _smartHubLocalMessagePort = null; // Local message port for receiving messag
 var _smartHubMessagePortListener = null; // Listener ID for the Smart Hub local message port
 var _previewApps = {}; // Per-host app cache for Smart Hub Preview: {serverUid: {hostname, address, apps: [{id, title, imageUri}]}}
 var _isSmartHubSupported = false; // Flag indicating if Smart Hub Preview is supported on this device
+var currentStreamConfig = null; // Configuration of the stream being started or played, null outside of a stream
 
 const REPEAT_DELAY = 350; // Repeat delay set to 350ms (milliseconds)
 const REPEAT_INTERVAL = 100; // Repeat interval set to 100ms (milliseconds)
@@ -157,10 +158,12 @@ function attachListeners() {
       const { type, index, pressed, value } = change;
       if (type === 'button') {
         // Handle button mapping
+        // SELECT and START mirror the CHANNEL UP and CHANNEL DOWN keys, as the navigation guide describes
         const buttonMapping = {
           0: () => delayedNavigation(() => Navigation.accept()),
           1: () => delayedNavigation(() => Navigation.back()),
-          8: () => delayedNavigation(() => Navigation.move()),
+          8: () => delayedNavigation(() => Navigation.press()),
+          9: () => delayedNavigation(() => Navigation.switch()),
         };
         // Handle D-Pad mapping
         const dPadMapping = {
@@ -1014,9 +1017,9 @@ function pairingDialog(nvhttpHost, onSuccess, onFailure) {
       // If the host is already in a streaming session or failed during pairing,
       // change the dialog text element to include the hostname and display the returned error message
       if (nvhttpHost.currentGame != 0) {
-        $('#pairingDialogText').html(t('Error: %1$s is currently busy!<br><br>You must stop the running app in order to pair with the host.', nvhttpHost.hostname));
+        $('#pairingDialogText').html(t('Error: %1$s is currently busy!<br><br>You must stop the running app in order to pair with the host.', escapeHtml(nvhttpHost.hostname)));
       } else {
-        $('#pairingDialogText').html(t('Error: Failed to pair with %1$s.<br><br>Please, try pairing with the host again.', nvhttpHost.hostname));
+        $('#pairingDialogText').html(t('Error: Failed to pair with %1$s.<br><br>Please, try pairing with the host again.', escapeHtml(nvhttpHost.hostname)));
       }
       onFailure();
     });
@@ -1055,6 +1058,7 @@ function autoWolDialog(host, onSuccess, onCancel) {
   var isPolling = true;
   var pollTimeout = null;
   var hasFailed = false;
+  var lastErrorMessage = '';
 
   var stopPollingTasks = function() {
     isPolling = false;
@@ -1071,12 +1075,12 @@ function autoWolDialog(host, onSuccess, onCancel) {
   };
 
   var sendWakeRequest = function() {
-    $('#autoWolDialogText').html(t('Sending a Wake-on-LAN request to %1$s...', host.hostname));
+    $('#autoWolDialogText').html(t('Sending a Wake-on-LAN request to %1$s...', escapeHtml(host.hostname)));
 
     host.sendWOL().then(function(msg) {
       if (msg) console.log('%c[index.js, autoWolDialog]', 'color: green;', msg);
       $('#autoWolDialogText').html(
-        t('Wake-on-LAN request sent to %1$s.', host.hostname) + '<br><br>' +
+        t('Wake-on-LAN request sent to %1$s.', escapeHtml(host.hostname)) + '<br><br>' +
         t('Waiting for the host PC to wake up and connect to the network...')
       );
 
@@ -1119,11 +1123,11 @@ function autoWolDialog(host, onSuccess, onCancel) {
       hasFailed = true;
       stopPollingTasks();
 
-      var errorMessage = typeof error === 'string' ? error : (error && error.message ? error.message : 'Unknown error');
-      var translatedError = replaceKnownWolErrorLabels(errorMessage);
+      lastErrorMessage = typeof error === 'string' ? error : (error && error.message ? error.message : 'Unknown error');
+      var translatedError = replaceKnownWolErrorLabels(lastErrorMessage);
       $('#autoWolDialogText').html(
-        t('Failed to send Wake-on-LAN request to %1$s!', host.hostname) + '<br><br>' +
-        t('Error: %1$s', translatedError)
+        t('Failed to send Wake-on-LAN request to %1$s!', escapeHtml(host.hostname)) + '<br><br>' +
+        t('Error: %1$s', escapeHtml(translatedError))
       );
       // Change the button text to "OK" to indicate that the user can acknowledge the failure
       $('#cancelAutoWol').html(t('OK'));
@@ -1133,7 +1137,7 @@ function autoWolDialog(host, onSuccess, onCancel) {
   $('#cancelAutoWol').off('click');
   $('#cancelAutoWol').on('click', function() {
     if (hasFailed) {
-      console.error('%c[index.js, autoWolDialog]', 'color: green;', 'Wake-on-LAN request failed: ' + errorMessage);
+      console.error('%c[index.js, autoWolDialog]', 'color: green;', 'Wake-on-LAN request failed: ' + lastErrorMessage);
     } else {
       console.log('%c[index.js, autoWolDialog]', 'color: green;', 'Wake-on-LAN request canceled by user.');
     }
@@ -1170,7 +1174,7 @@ function addHostToGrid(host, ismDNSDiscovered) {
   // Create the host text placeholder that will contain the host name
   var hostText = $('<span>', {
     class: 'host-text',
-    html: host.hostname
+    text: host.hostname
   });
 
   // Create the host menu button with the appropriate attributes for the host menu
@@ -1416,7 +1420,7 @@ function deleteHostDialog(host) {
 
   // Change the dialog title and text elements to include the hostname
   document.getElementById('deleteHostDialogTitle').innerHTML = t('Delete Host');
-  document.getElementById('deleteHostDialogText').innerHTML = t('Are you sure you want to delete %1$s?', host.hostname);
+  document.getElementById('deleteHostDialogText').innerHTML = t('Are you sure you want to delete %1$s?', escapeHtml(host.hostname));
 
   // Show the dialog and push the view
   deleteHostOverlay.style.display = 'flex';
@@ -1564,16 +1568,16 @@ function hostDetailsDialog(host) {
     id: 'hostDetailsDialogText-' + host.serverUid,
     class: 'host-details-text',
     html: [
-      t('Name: %1$s', host.hostname),
+      t('Name: %1$s', escapeHtml(host.hostname)),
       t('State: %1$s', host.online ? t('ONLINE') : t('OFFLINE')),
-      t('Active Address: %1$s', host.address && host.externalPort ? host.address + ':' + host.externalPort : t('NULL')),
-      t('UUID: %1$s', host.serverUid ? host.serverUid : t('NULL')),
-      t('Local Address: %1$s', host.localAddress && host.externalPort ? host.localAddress + ':' + host.externalPort : t('NULL')),
-      t('MAC Address: %1$s', host.macAddress ? host.macAddress : t('NULL')),
+      t('Active Address: %1$s', host.address && host.externalPort ? escapeHtml(host.address + ':' + host.externalPort) : t('NULL')),
+      t('UUID: %1$s', host.serverUid ? escapeHtml(host.serverUid) : t('NULL')),
+      t('Local Address: %1$s', host.localAddress && host.externalPort ? escapeHtml(host.localAddress + ':' + host.externalPort) : t('NULL')),
+      t('MAC Address: %1$s', host.macAddress ? escapeHtml(host.macAddress) : t('NULL')),
       t('Pair State: %1$s', host.paired ? t('PAIRED') : t('UNPAIRED')),
-      t('Running Game ID: %1$s', host.currentGame),
-      t('HTTP Port: %1$s', host.httpPort ? host.httpPort : t('NULL')),
-      t('HTTPS Port: %1$s', host.httpsPort ? host.httpsPort : t('NULL'))
+      t('Running Game ID: %1$s', escapeHtml(host.currentGame)),
+      t('HTTP Port: %1$s', host.httpPort ? escapeHtml(host.httpPort) : t('NULL')),
+      t('HTTPS Port: %1$s', host.httpsPort ? escapeHtml(host.httpsPort) : t('NULL'))
     ].join('<br>')
   }).appendTo(hostDetailsDialogContent);
 
@@ -1828,8 +1832,13 @@ function fetchLatestRelease() {
 
 // Compare the current version with the latest version to determine if an update is available
 function checkVersionUpdate(currentVersion, latestVersion) {
-  const currentVerParts = currentVersion.split('.').map(Number);
-  const latestVerParts = latestVersion.split('.').map(Number);
+  // Read each part as a number, ignoring suffixes such as '-beta' and treating missing parts as 0
+  const toParts = (version) => String(version).split('.').map((part) => parseInt(part, 10) || 0);
+  const currentVerParts = toParts(currentVersion);
+  const latestVerParts = toParts(latestVersion);
+  while (currentVerParts.length < latestVerParts.length) {
+    currentVerParts.push(0);
+  }
 
   // Compare each part of the version numbers
   for (let i = 0; i < latestVerParts.length; i++) {
@@ -1864,7 +1873,8 @@ function extractReleaseNotes(releaseNotes) {
 	  if (cleaned && !cleaned.endsWith('.')) {
 	    cleaned += '.';
 	  }
-	  return cleaned;
+	  // The notes are shown as HTML, so escape the text of each line before joining them
+	  return escapeHtml(cleaned);
   }).filter(line => line !== '').join('<br>');
 }
 
@@ -2155,7 +2165,7 @@ function wakeOnLanWarningDialog(host) {
   // Set the title and message
   document.getElementById('warningDialogTitle').innerHTML = t('Wake-on-LAN Warning');
   document.getElementById('warningDialogText').innerHTML = t(
-    'The MAC address of %1$s (%2$s) appears to be randomly generated.', host.hostname, host.macAddress) + '<br><br>' +
+    'The MAC address of %1$s (%2$s) appears to be randomly generated.', escapeHtml(host.hostname), escapeHtml(host.macAddress)) + '<br><br>' +
     t('The Operating System may be using a random MAC address instead of the physical network card address.') + ' ' +
     t('Wake-on-LAN may be unable to wake up the machine since the MAC address does not match the one from the network card.');
 
@@ -2392,6 +2402,8 @@ function showAppsMode() {
   // it slows down box art loading and we don't update the UI live anyway.
   stopPollingHosts();
   Navigation.start();
+  // Navigate the user interface with the gamepads again after a stream
+  Controller.resume();
 }
 
 // Show the Apps grid
@@ -2520,7 +2532,7 @@ function showApps(host) {
             // Create the game text placeholder that will contain the game name
             var gameText = $('<span>', {
               class: 'game-text',
-              html: app.title
+              text: app.title
             });
 
             // Append the game text to the game title wrapper
@@ -2678,7 +2690,7 @@ function quitAppDialog() {
       var quitAppDialog = document.querySelector('#quitAppDialog');
 
       // Change the dialog text element to include the game title
-      document.getElementById('quitAppDialogText').innerHTML = t('Are you sure you want to quit %1$s? All unsaved data will be lost.', currentGame.title);
+      document.getElementById('quitAppDialogText').innerHTML = t('Are you sure you want to quit %1$s? All unsaved data will be lost.', escapeHtml(currentGame.title));
       
       // Show the dialog and push the view
       quitAppOverlay.style.display = 'flex';
@@ -2727,12 +2739,15 @@ function showStreamMode() {
   fullscreenWasmModule();
   handleOnScreenOverlays();
   Navigation.stop();
+  // The WASM module reads the gamepads itself while streaming
+  Controller.pause();
 }
 
 // Maximize the size of the Wasm module by scaling and resizing appropriately
 function fullscreenWasmModule() {
-  var streamWidth = $('#selectResolution').data('value').split(':')[0];
-  var streamHeight = $('#selectResolution').data('value').split(':')[1];
+  // Scale the resolution of the running stream, which may differ from the selected one
+  var streamWidth = currentStreamConfig ? currentStreamConfig.width : $('#selectResolution').data('value').split(':')[0];
+  var streamHeight = currentStreamConfig ? currentStreamConfig.height : $('#selectResolution').data('value').split(':')[1];
   var screenWidth = window.innerWidth;
   var screenHeight = window.innerHeight;
 
@@ -2777,6 +2792,14 @@ function startGame(host, appID) {
   // Refresh the server info, because the user might have quit the game
   host.refreshServerInfo().then(function(ret) {
     host.getAppById(appID).then(function(appToStart) {
+      if (!appToStart) {
+        // The app was removed from the host since the list was loaded
+        console.error('%c[index.js, startGame]', 'color: green;', 'Error: App ' + appID + ' is no longer available on the host!');
+        stopAudioScheduler();
+        snackbarLogLong('The selected app is no longer available on this host. Showing the current app list.');
+        returnToAppsAfterStreamFailure(host);
+        return;
+      }
       if (host.currentGame != 0 && host.currentGame != appID) {
         host.getAppById(host.currentGame).then(function(currentApp) {
           // Find the existing overlay and dialog elements
@@ -2784,7 +2807,7 @@ function startGame(host, appID) {
           var quitAppDialog = document.querySelector('#quitAppDialog');
 
           // Change the dialog text element to include the game title
-          document.getElementById('quitAppDialogText').innerHTML = t('%1$s is already running. Would you like to quit it and start %2$s?', currentApp.title, appToStart.title);
+          document.getElementById('quitAppDialogText').innerHTML = t('%1$s is already running. Would you like to quit it and start %2$s?', escapeHtml(currentApp.title), escapeHtml(appToStart.title));
 
           // Show the dialog and push the view
           quitAppOverlay.style.display = 'flex';
@@ -2831,163 +2854,184 @@ function startGame(host, appID) {
       }
 
       // Retrieve all stream configuration options from the Settings view
-      var streamWidth = $('#selectResolution').data('value').split(':')[0];
-      var streamHeight = $('#selectResolution').data('value').split(':')[1];
-      var frameRate = $('#selectFramerate').data('value').toString();
-      var bitrate = parseFloat($('#bitrateSlider').val()) * 1000;
+      var config = buildStreamConfig();
       var rikey = generateRemoteInputKey();
       var rikeyid = generateRemoteInputKeyId();
       var gamepadMask = getConnectedGamepadMask();
-      const framePacing = $('#framePacingSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const optimizeGames = $('#optimizeGamesSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const rumbleFeedback = $('#rumbleFeedbackSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const mouseEmulation = $('#mouseEmulationSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const flipABfaceButtons = $('#flipABfaceButtonsSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const flipXYfaceButtons = $('#flipXYfaceButtonsSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      var audioBackend = $('#selectAudioBackend').data('value').toString();
-      var audioConfig = $('#selectAudio').data('value').toString();
-      const audioSync = $('#audioSyncSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const audioJitter = parseInt($('#jitterSlider').val());
-      const playHostAudio = $('#playHostAudioSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      var videoCodec = $('#selectCodec').data('value').toString();
-      const hdrMode = $('#hdrModeSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const fullRange = $('#fullRangeSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const gameMode = $('#gameModeSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const disableWarnings = $('#disableWarningsSwitch').parent().hasClass('is-checked') ? 1 : 0;
-      const performanceStats = $('#performanceStatsSwitch').parent().hasClass('is-checked') ? 1 : 0;
 
       console.log('%c[index.js, startGame]', 'color: green;', 'startRequest:' + 
       '\n Host address: ' + host.address + ':' + host.httpPort + 
-      '\n Video resolution: ' + streamWidth + 'x' + streamHeight + 
-      '\n Video frame rate: ' + frameRate + ' FPS' + 
-      '\n Video bitrate: ' + bitrate + ' Kbps' + 
-      '\n Video frame pacing: ' + framePacing + 
-      '\n Optimize game settings: ' + optimizeGames + 
-      '\n Rumble feedback: ' + rumbleFeedback + 
-      '\n Mouse emulation: ' + mouseEmulation + 
-      '\n Flip A/B face buttons: ' + flipABfaceButtons + 
-      '\n Flip X/Y face buttons: ' + flipXYfaceButtons + 
-      '\n Audio backend: ' + audioBackend + 
-      '\n Audio configuration: ' + audioConfig + 
-      '\n Audio synchronization: ' + audioSync + 
-      '\n Audio jitter buffer: ' + audioJitter + ' ms' +
-      '\n Play host audio: ' + playHostAudio + 
-      '\n Video codec: ' + videoCodec + 
-      '\n Video HDR mode: ' + hdrMode + 
-      '\n Full color range: ' + fullRange + 
-      '\n Game Mode: ' + gameMode + 
-      '\n Disable connection warnings: ' + disableWarnings + 
-      '\n Performance statistics: ' + performanceStats);
+      '\n Video resolution: ' + config.width + 'x' + config.height + 
+      '\n Video frame rate: ' + config.fps + ' FPS' + 
+      '\n Video bitrate: ' + config.bitrate + ' Kbps' + 
+      '\n Video frame pacing: ' + config.framePacing + 
+      '\n Optimize game settings: ' + config.optimizeGames + 
+      '\n Rumble feedback: ' + config.rumbleFeedback + 
+      '\n Mouse emulation: ' + config.mouseEmulation + 
+      '\n Flip A/B face buttons: ' + config.flipABfaceButtons + 
+      '\n Flip X/Y face buttons: ' + config.flipXYfaceButtons + 
+      '\n Audio backend: ' + config.audioBackend + 
+      '\n Audio configuration: ' + config.audioConfig + 
+      '\n Audio synchronization: ' + config.audioSync + 
+      '\n Audio jitter buffer: ' + config.audioJitter + ' ms' +
+      '\n Play host audio: ' + config.playHostAudio + 
+      '\n Video codec: ' + config.videoCodec + 
+      '\n Video HDR mode: ' + config.hdrMode + 
+      '\n Full color range: ' + config.fullRange + 
+      '\n Game Mode: ' + config.gameMode + 
+      '\n Disable connection warnings: ' + config.disableWarnings + 
+      '\n Performance statistics: ' + config.performanceStats);
 
       // Hide on-screen overlays until the streaming session begins
       $('#connection-warnings, #performance-stats').css('background', 'transparent').text('');
 
       // Shows a loading message to launch the application and start stream mode
+      currentStreamConfig = config;
       $('#loadingSpinnerMessage').text(t('Starting %1$s...', appToStart.title));
       showStreamMode();
 
-      // Check if user wants to resume the already-running app
-      if (host.currentGame == appID) {
-        // If the app is already running, we can just resume it
-        return host.resumeApp(
-          streamWidth + 'x' + streamHeight + 'x' + frameRate, // Resolution and frame rate
-          optimizeGames, // Optimize game settings (SOPS)
-          rikey, rikeyid, // Remote input key and key ID
-          hdrMode, // Auto HDR video streaming
-          playHostAudio, // Play audio on host and client device
-          0x030002, // Surround channel mask << 16 | Surround channel count
-          gamepadMask // Connect gamepad mask
-        ).then(function(launchResult) {
-          $xml = $($.parseXML(launchResult.toString()));
-          $root = $xml.find('root');
-          var status_code = $root.attr('status_code');
-          var status_message = $root.attr('status_message');
-          if (status_code != 200) {
-            $('#loadingSpinnerMessage').text('');
-            snackbarLogLong('Error %1$s: %2$s', status_code, status_message);
-            showApps(host).then(() => {
-              // Scroll to the current game row
-              Navigation.switch();
-              // Switch to Apps view
-              Navigation.change(Views.Apps);
-            });
-            return;
-          }
-          // Start stream request
-          sendMessage('startRequest', [
-            host.address, host.httpPort, streamWidth, streamHeight, frameRate, bitrate.toString(), rikey, rikeyid.toString(),
-            host.appVersion, host.gfeVersion, $root.find('sessionUrl0').text().trim(), host.serverCodecModeSupport,
-            framePacing, optimizeGames, rumbleFeedback, mouseEmulation, flipABfaceButtons, flipXYfaceButtons,
-            audioBackend, audioConfig, audioSync, audioJitter, playHostAudio, videoCodec, hdrMode, fullRange, gameMode,
-            disableWarnings, performanceStats
-          ]);
-        }, function(failedResumeApp) {
-          console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to resume app with id: ' + appID + '\n Returned error was: ' + failedResumeApp + '!');
-          snackbarLog('Failed to resume %1$s', appToStart.title);
-          showApps(host).then(() => {
-            // Scroll to the current game row
-            Navigation.switch();
-            // Switch to Apps view
-            Navigation.change(Views.Apps);
-          });
-          return;
-        });
-      }
+      var mode = config.width + 'x' + config.height + 'x' + config.fps;
+      var surroundAudioInfo = surroundAudioInfoFor(config.audioConfig);
 
-      // If the user wants to launch the app, then we start launching it
-      host.launchApp(
-        appID, // App ID
-        streamWidth + 'x' + streamHeight + 'x' + frameRate, // Resolution and frame rate
-        optimizeGames, // Optimize game settings (SOPS)
-        rikey, rikeyid, // Remote input key and key ID
-        hdrMode, // Auto HDR video streaming
-        playHostAudio, // Play audio on host and client device
-        0x030002, // Surround channel mask << 16 | Surround channel count
-        gamepadMask // Connect gamepad mask
-      ).then(function(launchResult) {
+      // Resume the app if it is already running, otherwise launch it
+      var isResume = host.currentGame == appID;
+      var launchRequest = isResume
+        ? host.resumeApp(mode, config.optimizeGames, rikey, rikeyid, config.hdrMode, config.playHostAudio, surroundAudioInfo, gamepadMask)
+        : host.launchApp(appID, mode, config.optimizeGames, rikey, rikeyid, config.hdrMode, config.playHostAudio, surroundAudioInfo, gamepadMask);
+
+      launchRequest.then(function(launchResult) {
         $xml = $($.parseXML(launchResult.toString()));
         $root = $xml.find('root');
         var status_code = $root.attr('status_code');
         var status_message = $root.attr('status_message');
         if (status_code != 200) {
-          if (status_code == 4294967295 && status_message == 'Invalid') {
+          if (!isResume && status_code == 4294967295 && status_message == 'Invalid') {
             // Special case handling an audio capture error which GFE doesn't provide any useful status message
             status_code = 418;
             status_message = t('Audio capture device is missing. Please reinstall the audio drivers.');
           }
           $('#loadingSpinnerMessage').text('');
           snackbarLogLong('Error %1$s: %2$s', status_code, status_message);
-          showApps(host).then(() => {
-            // Scroll to the current game row
-            Navigation.switch();
-            // Switch to Apps view
-            Navigation.change(Views.Apps);
-          });
+          returnToAppsAfterStreamFailure(host);
           return;
         }
         // Start stream request
-        sendMessage('startRequest', [
-          host.address, host.httpPort, streamWidth, streamHeight, frameRate, bitrate.toString(), rikey, rikeyid.toString(),
-          host.appVersion, host.gfeVersion, $root.find('sessionUrl0').text().trim(), host.serverCodecModeSupport,
-          framePacing, optimizeGames, rumbleFeedback, mouseEmulation, flipABfaceButtons, flipXYfaceButtons,
-          audioBackend, audioConfig, audioSync, audioJitter, playHostAudio, videoCodec, hdrMode, fullRange, gameMode,
-          disableWarnings, performanceStats
+        requestStreamStart(host, config, [
+          host.address, host.httpPort, String(config.width), String(config.height), String(config.fps), String(config.bitrate),
+          rikey, rikeyid.toString(), host.appVersion, host.gfeVersion, $root.find('sessionUrl0').text().trim(), host.serverCodecModeSupport,
+          config.framePacing, config.optimizeGames, config.rumbleFeedback, config.mouseEmulation, config.flipABfaceButtons, config.flipXYfaceButtons,
+          config.audioBackend, config.audioConfig, config.audioSync, config.audioJitter, config.playHostAudio, config.videoCodec, config.hdrMode,
+          config.fullRange, config.gameMode, config.disableWarnings, config.performanceStats
         ]);
       }, function(failedLaunchApp) {
-        console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to launch app with id: ' + appID + '\n Returned error was: ' + failedLaunchApp + '!');
-        snackbarLog('Failed to launch %1$s', appToStart.title);
-        showApps(host).then(() => {
-          // Scroll to the current game row
-          Navigation.switch();
-          // Switch to Apps view
-          Navigation.change(Views.Apps);
-        });
-        return;
+        console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to ' + (isResume ? 'resume' : 'launch') + ' app with id: ' + appID + '\n Returned error was: ' + failedLaunchApp + '!');
+        if (isResume) {
+          snackbarLog('Failed to resume %1$s', appToStart.title);
+        } else {
+          snackbarLog('Failed to launch %1$s', appToStart.title);
+        }
+        returnToAppsAfterStreamFailure(host);
       });
     });
   }, function(failedRefreshInfo) {
     console.error('%c[index.js, startGame]', 'color: green;', 'Error: Failed to refresh server info! Returned error was: ' + failedRefreshInfo + ' and failed server was: ' + '\n', host, '\n' + host.toString()); // Logging both object (for console) and toString-ed object (for text logs)
+    // The stream never started, so release the audio context opened for it
+    stopAudioScheduler();
+    snackbarLogLong('Failed to connect to %1$s. Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.', host.hostname);
   });
+}
+
+// Collect the stream configuration from the Settings view
+function buildStreamConfig() {
+  var isChecked = function(switchId) {
+    return $('#' + switchId).parent().hasClass('is-checked') ? 1 : 0;
+  };
+  var resolution = $('#selectResolution').data('value').split(':');
+
+  return {
+    width: parseInt(resolution[0], 10),
+    height: parseInt(resolution[1], 10),
+    fps: parseInt($('#selectFramerate').data('value'), 10),
+    bitrate: Math.round(parseFloat($('#bitrateSlider').val()) * 1000), // Kbps
+    framePacing: isChecked('framePacingSwitch'),
+    optimizeGames: isChecked('optimizeGamesSwitch'),
+    rumbleFeedback: isChecked('rumbleFeedbackSwitch'),
+    mouseEmulation: isChecked('mouseEmulationSwitch'),
+    flipABfaceButtons: isChecked('flipABfaceButtonsSwitch'),
+    flipXYfaceButtons: isChecked('flipXYfaceButtonsSwitch'),
+    audioBackend: $('#selectAudioBackend').data('value').toString(),
+    audioConfig: $('#selectAudio').data('value').toString(),
+    audioSync: isChecked('audioSyncSwitch'),
+    audioJitter: parseInt($('#jitterSlider').val(), 10),
+    playHostAudio: isChecked('playHostAudioSwitch'),
+    videoCodec: $('#selectCodec').data('value').toString(),
+    hdrMode: isChecked('hdrModeSwitch'),
+    fullRange: isChecked('fullRangeSwitch'),
+    gameMode: isChecked('gameModeSwitch'),
+    disableWarnings: isChecked('disableWarningsSwitch'),
+    performanceStats: isChecked('performanceStatsSwitch'),
+  };
+}
+
+// Surround audio information sent with the launch request: channel mask << 16 | channel count.
+// This used to be fixed to Stereo, so the host was never asked for 5.1 or 7.1 audio at launch.
+function surroundAudioInfoFor(audioConfig) {
+  switch (audioConfig) {
+    case '51Surround':
+      return (0x3F << 16) | 6;
+    case '71Surround':
+      return (0x63F << 16) | 8;
+    default:
+      return (0x3 << 16) | 2;
+  }
+}
+
+// Return to the Apps view after the stream could not be started
+function returnToAppsAfterStreamFailure(host) {
+  isStreamSessionActive = false;
+  currentStreamConfig = null;
+  stopAudioScheduler();
+  showApps(host).then(() => {
+    // Scroll to the current game row
+    Navigation.switch();
+    // Switch to Apps view
+    Navigation.change(Views.Apps);
+  });
+}
+
+// Ask the WASM module to start the stream once the previous session is fully torn down. The module
+// refuses to start while it is still closing the media pipeline of the previous session, which it
+// confirms with StreamCleanupDone, so wait for that and retry for a few seconds before giving up.
+function requestStreamStart(host, config, startArgs) {
+  var STREAM_START_TIMEOUT = 8000;
+  var STREAM_START_RETRY_DELAY = 250;
+  var startedAt = Date.now();
+
+  isStreamSessionActive = true;
+  decoderSetupErrorShown = false;
+
+  var attempt = function() {
+    if (!isStreamSessionActive) {
+      // The user left the stream while it was waiting to start
+      return;
+    }
+    if (isStreamTeardownPending && Date.now() - startedAt < STREAM_START_TIMEOUT) {
+      setTimeout(attempt, STREAM_START_RETRY_DELAY);
+      return;
+    }
+    sendMessage('startRequest', startArgs).catch(function(error) {
+      if ((error === 'teardown-in-progress' || error === 'stream-running') && Date.now() - startedAt < STREAM_START_TIMEOUT) {
+        setTimeout(attempt, STREAM_START_RETRY_DELAY);
+        return;
+      }
+      console.error('%c[index.js, requestStreamStart]', 'color: green;', 'Error: The stream could not be started: ' + error);
+      $('#loadingSpinnerMessage').text('');
+      snackbarLogLong('The stream could not be started. Please try again in a moment.');
+      returnToAppsAfterStreamFailure(host);
+    });
+  };
+
+  attempt();
 }
 
 // Stop the running app title, refresh the server info, and then return to Apps grid
@@ -3002,6 +3046,8 @@ function stopGame(host, callbackFunction) {
     host.getAppById(host.currentGame).then(function(runningApp) {
       if (!runningApp) {
         snackbarLog('No app is currently running.');
+        // Let the caller continue, for example to start the app it wanted to launch
+        if (typeof(callbackFunction) === "function") callbackFunction();
         return;
       }
       var appTitle = runningApp.title;
@@ -3212,17 +3258,18 @@ function saveFramerate() {
 }
 
 function warnResolutionFramerate() {
-  var chosenResolutionWidth = $('#selectResolution').data('value').split(':')[0];
-  var chosenResolutionHeight = $('#selectResolution').data('value').split(':')[1];
-  var chosenFramerate = $('#selectFramerate').data('value');
+  // Compare the values as numbers, as comparing the strings ranked 854 above 1920 and 120 below 60
+  var chosenResolutionWidth = parseInt($('#selectResolution').data('value').split(':')[0], 10);
+  var chosenResolutionHeight = parseInt($('#selectResolution').data('value').split(':')[1], 10);
+  var chosenFramerate = parseInt($('#selectFramerate').data('value'), 10);
 
   // Video resolution and frame rate warning
-  if (!resFpsWarning && chosenResolutionWidth > '1920' && chosenResolutionHeight > '1080' && chosenFramerate > '60') {
+  if (!resFpsWarning && chosenResolutionWidth > 1920 && chosenResolutionHeight > 1080 && chosenFramerate > 60) {
     // Warn only if video resolution is greater than 1080p and frame rate is greater than 60 FPS
     snackbarLogLong('Warning: This resolution and frame rate may not perform well on lower-end devices or slower connections!');
     // Set flag for video resolution and frame rate warning
     resFpsWarning = true;
-  } else if (resFpsWarning && (chosenResolutionWidth <= '1920' || chosenResolutionHeight <= '1080' || chosenFramerate <= '60')) {
+  } else if (resFpsWarning && (chosenResolutionWidth <= 1920 || chosenResolutionHeight <= 1080 || chosenFramerate <= 60)) {
     // Reset the flag for video resolution and frame rate warning if the condition goes back to normal (1080p and 60 FPS)
     resFpsWarning = false;
   }

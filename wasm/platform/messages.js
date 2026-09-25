@@ -152,8 +152,9 @@ var sendMessage = function(method, params) {
   if (SyncFunctions[method]) {
     return new Promise(function(resolve, reject) {
       const ret = SyncFunctions[method](...params);
-      if (ret.type === "resolve") {
-        resolve(ret.ret);
+      // Functions without a result (such as toggleStats) simply resolve
+      if (!ret || ret.type === "resolve") {
+        resolve(ret ? ret.ret : undefined);
       } else {
         reject(ret.ret);
       }
@@ -221,8 +222,36 @@ var sendMessage = function(method, params) {
 }
 
 var handlePromiseMessage = function(callbackId, type, msg) {
+  if (!callbacks[callbackId]) {
+    console.warn('%c[messages.js, handlePromiseMessage]', 'color: gray;', 'Warning: No pending request for callback ' + callbackId);
+    return;
+  }
   callbacks[callbackId][type](msg);
   delete callbacks[callbackId];
+}
+
+// Whether a streaming session is waiting for its termination to be handled. The WASM module can
+// report the end of a session more than once (for example when a stop request races a connection
+// failure), and handling it twice would return to the app list twice.
+var isStreamSessionActive = false;
+
+// Whether the WASM module is still closing the media pipeline of the previous session
+var isStreamTeardownPending = false;
+
+// Set when the decoder setup reported a specific error, so that the generic stage failure the
+// WASM module reports right after it does not open a second dialog
+var decoderSetupErrorShown = false;
+
+// Describes a decoder setup failure reported by the WASM module in terms the user can act on
+function describeDecoderSetupFailure(detail) {
+  var kind = detail.split(':')[0];
+  var info = detail.substring(kind.length + 1);
+  if (kind === 'audio') {
+    return t('Your TV could not open an audio output with %1$s channels. Select Stereo in the audio settings and try again.', info);
+  }
+  var codec = /av01/.test(info) ? 'AV1' : (/hev1|hvc1/.test(info) ? 'HEVC' : 'H.264');
+  var hdr = /\.10|hev1\.2/.test(info);
+  return t('Your TV has no hardware decoder for %1$s%2$s video. Select another video codec or disable HDR, then try again.', codec, hdr ? ' 10-bit' : '');
 }
 
 /**
@@ -235,6 +264,16 @@ function handleMessage(msg) {
   console.log('%c[messages.js, handleMessage]', 'color: gray;', 'Message data: ', msg);
   // If it's a recognized event, notify the appropriate function
   if (msg.indexOf('streamTerminated: ') === 0) {
+    // The WASM module closes the media pipeline in the background after reporting the end of the
+    // session, and a new stream can only start once it confirms with StreamCleanupDone
+    isStreamTeardownPending = true;
+    // Handle the end of each session once, even if the WASM module reports it more than once
+    if (!isStreamSessionActive) {
+      console.log('%c[messages.js, handleMessage]', 'color: gray;', 'Ignoring a repeated stream termination.');
+      return;
+    }
+    isStreamSessionActive = false;
+    currentStreamConfig = null;
     // Release the audio scheduler of the Web Audio backend, which is a no-op for the EMSS backend
     stopAudioScheduler();
     // Remove the on-screen overlays
@@ -291,6 +330,13 @@ function handleMessage(msg) {
         }
       });
     });
+  } else if (msg === 'StreamCleanupDone') {
+    // The media pipeline of the previous session is closed, so a new stream can start
+    isStreamTeardownPending = false;
+  } else if (msg.indexOf('DecoderSetupFailed: ') === 0) {
+    // Explain which decoder the TV could not open instead of the generic stage failure
+    decoderSetupErrorShown = true;
+    warningDialog(t('Unsupported Stream Format'), describeDecoderSetupFailure(msg.replace('DecoderSetupFailed: ', '')));
   } else if (msg === 'Connection Established') {
     // Prepare the screen for video stream
     $('#loadingSpinner').css('display', 'none');
@@ -304,8 +350,14 @@ function handleMessage(msg) {
     // Show transient message as notification
     snackbarLogLong(translateBackendMessage(msg.replace('TransientMsg: ', '')));
   } else if (msg.indexOf('DialogMsg: ') === 0) {
+    // The stage failure that follows a decoder setup error was already explained to the user
+    if (decoderSetupErrorShown) {
+      decoderSetupErrorShown = false;
+      console.warn('%c[messages.js, handleMessage]', 'color: gray;', msg);
+      return;
+    }
     // Show dialog message using the warning dialog
-    warningDialog(t('Connection Error'), translateBackendMessage(msg.replace('DialogMsg: ', '')));
+    warningDialog(t('Connection Error'), escapeHtml(translateBackendMessage(msg.replace('DialogMsg: ', ''))));
   } else if (msg === 'displayVideo') {
     // Show the video stream now
     $('#listener').addClass('fullscreen');
@@ -338,7 +390,7 @@ function handleMessage(msg) {
     $('#performance-stats').css('background', 'rgba(0, 0, 0, 0.5)');
     $('#performance-stats').text(translateBackendMessage(msg.replace('StatMsg: ', '')));
   } else if (msg.indexOf('controllerRumble: ') === 0) {
-    const eventData = msg.split(' ')[1].split(',');
+    const eventData = msg.substring('controllerRumble: '.length).split(',');
     const gamepadIdx = parseInt(eventData[0]);
     const weakMagnitude = parseFloat(eventData[1]);
     const strongMagnitude = parseFloat(eventData[2]);

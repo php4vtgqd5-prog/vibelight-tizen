@@ -129,6 +129,7 @@ class MoonlightInstance {
   void OnConnectionStopped(uint32_t unused);
   void OnConnectionStarted(uint32_t error);
   void StopConnection();
+  void TeardownMediaPipeline();
 
   static uint32_t ProfilerGetPackedMillis();
   static uint64_t ProfilerGetMillis();
@@ -248,10 +249,22 @@ class MoonlightInstance {
   bool m_PerformanceStatsEnabled;
 
   STREAM_CONFIGURATION m_StreamConfig;
-  bool m_Running;
+  // Read by the input thread while the connection and stop threads update it
+  std::atomic<bool> m_Running{false};
 
   pthread_t m_ConnectionThread;
   pthread_t m_InputThread;
+  // Whether the threads above were created for the current session and still need to be joined.
+  // They are only touched by the thread that owns the session teardown.
+  bool m_ConnectionThreadStarted = false;
+  bool m_InputThreadStarted = false;
+  // Set while a session is being torn down. A new stream must not start before the media source of
+  // the previous one is closed, and waiting for that on the main thread would deadlock, because the
+  // close callback of the media source is delivered on the main thread.
+  std::atomic<bool> m_TeardownInProgress{false};
+  // Incremented for every stream, so that a late close callback of a previous media source cannot
+  // reset the tracks of the session that replaced it
+  std::atomic<uint32_t> m_PipelineGeneration{0};
 
   OpusMSDecoder* m_OpusDecoder;
 

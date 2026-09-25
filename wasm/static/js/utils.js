@@ -1,3 +1,13 @@
+// Escapes text that is inserted into HTML, such as host names and app titles reported by a host
+function escapeHtml(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Safely wraps IPv6 addresses in brackets for URL construction.
 // IPv4 addresses and DNS hostnames do not contain colons, so they are untouched.
 function formatAddressForUrl(address) {
@@ -971,11 +981,13 @@ NvHTTP.prototype = {
   },
 
   quitApp: function() {
-    // Refresh server info after quitting because it may silently fail if the session belongs to a different client
+    // Refresh server info after quitting because it may silently fail if the session belongs to a different client.
+    // The refresh used to start together with the quit request instead of after it, so it could report the app as running.
     return sendMessage('openUrl', [
       this._baseUrlHttps + '/cancel?' + this._buildUidStr(), this.ppkstr, false
-    ]).then(this.refreshServerInfo());
-    // TODO: We should probably bubble this up to our caller.
+    ]).then((response) => {
+      return this.refreshServerInfo().then(() => response, () => response);
+    });
   },
 
   updateExternalAddressIP4: function() {

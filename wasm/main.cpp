@@ -1,7 +1,10 @@
 #include "moonlight_wasm.hpp"
 
+#include <errno.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -12,6 +15,7 @@ extern char* g_UniqueId;
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <emscripten/threading.h>
 
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -54,6 +58,8 @@ MoonlightInstance::MoonlightInstance()
     m_EmssReadyState(EmssReadyState::kDetached),
     m_AudioStarted(false),
     m_VideoStarted(false),
+    m_ConnectionCancelled(false),
+    m_StopThread(0),
     m_AudioSessionId(0),
     m_VideoSessionId(0),
     m_MediaElement("wasm_module"),
@@ -63,13 +69,11 @@ MoonlightInstance::MoonlightInstance()
     m_VideoTrackListener(this),
     m_AudioTrack(),
     m_VideoTrack(),
-    m_ConnectionCancelled(false),
-    m_StopThread(0),
     m_SourceClosed(false) {
       m_Dispatcher.start();
     }
 
-MoonlightInstance::~MoonlightInstance() { 
+MoonlightInstance::~MoonlightInstance() {
   m_Dispatcher.stop();
 }
 
@@ -79,6 +83,15 @@ void MoonlightInstance::OnConnectionStarted(uint32_t unused) {
 }
 
 void MoonlightInstance::OnConnectionStopped(uint32_t error) {
+  // Only the first stop request tears the session down. The connection terminated callback and a
+  // stop requested by the user can race each other, and a second teardown thread would overwrite
+  // the handle of the first one and close the media source twice.
+  bool expected = false;
+  if (!m_TeardownInProgress.compare_exchange_strong(expected, true)) {
+    ClLogMessage("Ignoring a stop request while the session is already being torn down\n");
+    return;
+  }
+
   // Not running anymore
   m_Running = false;
 
@@ -103,54 +116,92 @@ void MoonlightInstance::StopConnection() {
   OnConnectionStopped(0);
 }
 
+void MoonlightInstance::TeardownMediaPipeline() {
+  // This runs on a worker thread, because the close callback below is delivered on the main thread
+  if (!m_Source) {
+    return;
+  }
+
+  const uint32_t generation = m_PipelineGeneration.load();
+  {
+    std::unique_lock<std::mutex> lock(m_Mutex);
+    m_SourceClosed = false;
+  }
+
+  // Close the media source and release tracks to ensure WebKit garbage collection
+  auto closeResult = m_Source->Close([generation](samsung::wasm::OperationResult err) {
+    // Leave the tracks alone if this callback arrives after a new stream already replaced them
+    if (g_Instance->m_PipelineGeneration.load() == generation) {
+      g_Instance->m_AudioTrack = samsung::wasm::ElementaryMediaTrack();
+      g_Instance->m_VideoTrack = samsung::wasm::ElementaryMediaTrack();
+    }
+
+    std::unique_lock<std::mutex> lock(g_Instance->m_Mutex);
+    g_Instance->m_SourceClosed = true;
+    g_Instance->m_SourceClosedCV.notify_all();
+  });
+
+  {
+    // Wait for the source to close before the next StartStream is allowed, which prevents it from
+    // stomping on our teardown. The wait is bounded, so a close callback that never arrives cannot
+    // leave the application unable to start another stream.
+    std::unique_lock<std::mutex> lock(m_Mutex);
+    if (!closeResult) {
+      ClLogMessage("Closing the media source failed, the tracks are released without waiting\n");
+    } else if (!m_SourceClosedCV.wait_for(lock, std::chrono::seconds(5), [this] { return m_SourceClosed.load(); })) {
+      ClLogMessage("Timed out waiting for the media source to close\n");
+    }
+
+    // Reset EMSS state variables for the next stream
+    m_EmssReadyState = EmssReadyState::kDetached;
+    m_AudioStarted = false;
+    m_VideoStarted = false;
+    m_AudioSessionId = 0;
+    m_VideoSessionId = 0;
+  }
+
+  if (!closeResult) {
+    m_AudioTrack = samsung::wasm::ElementaryMediaTrack();
+    m_VideoTrack = samsung::wasm::ElementaryMediaTrack();
+  }
+}
+
 void* MoonlightInstance::StopThreadFunc(void* context) {
   // We must join the connection thread first, because LiStopConnection must
   // not be invoked during LiStartConnection.
-  pthread_join(g_Instance->m_ConnectionThread, NULL);
-
-  // Force raise all modifier keys to avoid leaving them down after disconnecting
-  LiSendKeyboardEvent(0xA0, KEY_ACTION_UP, 0);
-  LiSendKeyboardEvent(0xA1, KEY_ACTION_UP, 0);
-  LiSendKeyboardEvent(0xA2, KEY_ACTION_UP, 0);
-  LiSendKeyboardEvent(0xA3, KEY_ACTION_UP, 0);
-  LiSendKeyboardEvent(0xA4, KEY_ACTION_UP, 0);
-  LiSendKeyboardEvent(0xA5, KEY_ACTION_UP, 0);
+  if (g_Instance->m_ConnectionThreadStarted) {
+    pthread_join(g_Instance->m_ConnectionThread, NULL);
+    g_Instance->m_ConnectionThreadStarted = false;
+  }
 
   // Not running anymore
   g_Instance->m_Running = false;
 
   // We also need to stop this thread after the connection thread, because it
   // depends on being initialized there.
-  pthread_join(g_Instance->m_InputThread, NULL);
+  if (g_Instance->m_InputThreadStarted) {
+    pthread_join(g_Instance->m_InputThread, NULL);
+    g_Instance->m_InputThreadStarted = false;
+
+    // Force raise all modifier keys to avoid leaving them down after disconnecting. The input
+    // stream only exists once the connection was established, which is when this thread started.
+    LiSendKeyboardEvent(0xA0, KEY_ACTION_UP, 0);
+    LiSendKeyboardEvent(0xA1, KEY_ACTION_UP, 0);
+    LiSendKeyboardEvent(0xA2, KEY_ACTION_UP, 0);
+    LiSendKeyboardEvent(0xA3, KEY_ACTION_UP, 0);
+    LiSendKeyboardEvent(0xA4, KEY_ACTION_UP, 0);
+    LiSendKeyboardEvent(0xA5, KEY_ACTION_UP, 0);
+  }
 
   // Stop the connection
   LiStopConnection();
 
-  // Close the media source and release tracks to ensure WebKit garbage collection
-  if (g_Instance && g_Instance->m_Source) {
-    g_Instance->m_Source->Close([](samsung::wasm::OperationResult err) {
-      g_Instance->m_AudioTrack = samsung::wasm::ElementaryMediaTrack();
-      g_Instance->m_VideoTrack = samsung::wasm::ElementaryMediaTrack();
-      
-      std::unique_lock<std::mutex> lock(g_Instance->m_Mutex);
-      g_Instance->m_SourceClosed = true;
-      g_Instance->m_SourceClosedCV.notify_all();
-    });
-    
-    // Synchronously wait for the source to close before exiting,
-    // which prevents the next StartStream from stomping on our teardown.
-    std::unique_lock<std::mutex> lock(g_Instance->m_Mutex);
-    g_Instance->m_SourceClosedCV.wait(lock, [] {
-      return g_Instance->m_SourceClosed.load();
-    });
-    
-    // Reset EMSS state variables for the next stream
-    g_Instance->m_EmssReadyState = EmssReadyState::kDetached;
-    g_Instance->m_AudioStarted = false;
-    g_Instance->m_VideoStarted = false;
-    g_Instance->m_AudioSessionId = 0;
-    g_Instance->m_VideoSessionId = 0;
-  }
+  // Close the media source of the session
+  g_Instance->TeardownMediaPipeline();
+
+  // Allow the next stream to start, and let the front end know it no longer has to wait
+  g_Instance->m_TeardownInProgress = false;
+  PostToJsAsync("StreamCleanupDone");
 
   return NULL;
 }
@@ -235,12 +286,28 @@ void* MoonlightInstance::ConnectionThreadFunc(void* context) {
   err = LiStartConnection(&serverInfo, &me->m_StreamConfig, &MoonlightInstance::s_ClCallbacks,
     &MoonlightInstance::s_DrCallbacks, &MoonlightInstance::s_ArCallbacks, NULL, 0, NULL, 0);
   if (err != 0) {
-    // Notify the JS code that the stream has ended!
+    // LiStartConnection cleans the connection up by itself when it fails, but the media source
+    // that the decoder setup attached to the media element must still be closed. A stop request
+    // that cancelled the connection owns that teardown already, as its thread joins this one.
+    bool expected = false;
+    const bool ownsTeardown = me->m_TeardownInProgress.compare_exchange_strong(expected, true);
+    if (ownsTeardown) {
+      me->TeardownMediaPipeline();
+    }
+
+    // Notify the JS code that the stream has ended! This is posted asynchronously, because the
+    // main thread may be waiting to join this thread when it tries to start the next stream.
     // NB: We pass error code 0 here to avoid triggering a "Connection terminated" warning message.
     if (me->m_ConnectionCancelled) {
-      PostToJs(MSG_STREAM_TERMINATED + std::to_string(0));
+      PostToJsAsync(MSG_STREAM_TERMINATED + std::to_string(0));
     } else {
-      PostToJs(MSG_STREAM_TERMINATED + std::to_string(err));
+      PostToJsAsync(MSG_STREAM_TERMINATED + std::to_string(err));
+    }
+
+    // Report the end of the teardown after the termination, as the front end waits for it
+    if (ownsTeardown) {
+      me->m_TeardownInProgress = false;
+      PostToJsAsync("StreamCleanupDone");
     }
     return NULL;
   }
@@ -248,15 +315,33 @@ void* MoonlightInstance::ConnectionThreadFunc(void* context) {
   // Set running state before starting connection-specific threads
   me->m_Running = true;
 
-  pthread_create(&me->m_InputThread, NULL, MoonlightInstance::InputThreadFunc, me);
+  if (pthread_create(&me->m_InputThread, NULL, MoonlightInstance::InputThreadFunc, me) == 0) {
+    me->m_InputThreadStarted = true;
+  } else {
+    ClLogMessage("Failed to create the input thread\n");
+  }
 
   return NULL;
 }
 
-static void HexStringToBytes(const char* str, char* output) {
-  for (size_t i = 0; i < strlen(str); i += 2) {
+static void HexStringToBytes(const char* str, char* output, size_t outputSize) {
+  const size_t length = strlen(str);
+  for (size_t i = 0; i + 1 < length && i / 2 < outputSize; i += 2) {
     sscanf(&str[i], "%2hhx", &output[i / 2]);
   }
+}
+
+// Parses a decimal number sent by the front end. std::stoi aborts the whole module on malformed
+// input, as exceptions cannot be caught in this build, so fall back to a default value instead.
+static int ParseIntOrDefault(const std::string& value, int fallback) {
+  char* end = nullptr;
+  errno = 0;
+  const long parsed = strtol(value.c_str(), &end, 10);
+  if (end == value.c_str() || errno == ERANGE || parsed < INT32_MIN || parsed > INT32_MAX) {
+    MoonlightInstance::ClLogMessage("Invalid numeric value '%s', using %d instead\n", value.c_str(), fallback);
+    return fallback;
+  }
+  return static_cast<int>(parsed);
 }
 
 MessageResult MoonlightInstance::StartStream(std::string host, int httpPort, std::string width, std::string height, std::string fps, std::string bitrate,
@@ -264,13 +349,30 @@ MessageResult MoonlightInstance::StartStream(std::string host, int httpPort, std
   bool framePacing, bool optimizeGames, bool rumbleFeedback, bool mouseEmulation, bool flipABfaceButtons, bool flipXYfaceButtons,
   std::string audioBackend, std::string audioConfig, bool audioSync, int audioJitterMs, bool playHostAudio, std::string videoCodec,
   bool hdrMode, bool fullRange, bool gameMode, bool disableWarnings, bool performanceStats) {
-  
+
+  // The previous session must be fully torn down first. Its teardown waits for a callback that is
+  // delivered on this (main) thread, so blocking here would deadlock: let the front end retry.
+  if (m_TeardownInProgress) {
+    ClLogMessage("Refusing to start a stream while the previous session is being torn down\n");
+    return MessageResult::Reject(emscripten::val(std::string("teardown-in-progress")));
+  }
+  if (m_Running) {
+    ClLogMessage("Refusing to start a stream while another one is running\n");
+    return MessageResult::Reject(emscripten::val(std::string("stream-running")));
+  }
+
   if (m_StopThread != 0) {
     pthread_join(m_StopThread, NULL);
     m_StopThread = 0;
   }
+  // A connection that failed to start ends its thread by itself, reap it before starting a new one
+  if (m_ConnectionThreadStarted) {
+    pthread_join(m_ConnectionThread, NULL);
+    m_ConnectionThreadStarted = false;
+  }
   m_ConnectionCancelled = false;
   m_SourceClosed = false;
+  m_PipelineGeneration++;
 
   PostToJs("Setting the Host address to: " + host + ":" + std::to_string(httpPort));
   PostToJs("Setting the Video resolution to: " + width + "x" + height);
@@ -302,10 +404,10 @@ MessageResult MoonlightInstance::StartStream(std::string host, int httpPort, std
 
   // Populate the stream configuration
   LiInitializeStreamConfiguration(&m_StreamConfig);
-  m_StreamConfig.width = stoi(width);
-  m_StreamConfig.height = stoi(height);
-  m_StreamConfig.fps = stoi(fps);
-  m_StreamConfig.bitrate = stoi(bitrate); // kilobits per second
+  m_StreamConfig.width = ParseIntOrDefault(width, 1280);
+  m_StreamConfig.height = ParseIntOrDefault(height, 720);
+  m_StreamConfig.fps = ParseIntOrDefault(fps, 60);
+  m_StreamConfig.bitrate = ParseIntOrDefault(bitrate, 10000); // kilobits per second
   m_StreamConfig.packetSize = 1392;
   m_StreamConfig.streamingRemotely = STREAM_CFG_AUTO;
 
@@ -389,8 +491,8 @@ MessageResult MoonlightInstance::StartStream(std::string host, int httpPort, std
   m_StreamConfig.encryptionFlags = ENCFLG_NONE;
 
   // Load the rikey and rikeyid into the stream configuration
-  HexStringToBytes(rikey.c_str(), m_StreamConfig.remoteInputAesKey);
-  int rikeyiv = htonl(stoi(rikeyid));
+  HexStringToBytes(rikey.c_str(), m_StreamConfig.remoteInputAesKey, sizeof(m_StreamConfig.remoteInputAesKey));
+  int rikeyiv = htonl(ParseIntOrDefault(rikeyid, 0));
   memcpy(m_StreamConfig.remoteInputAesIv, &rikeyiv, sizeof(rikeyiv));
 
   // Manage gamepad input states based on selected settings
@@ -430,11 +532,12 @@ MessageResult MoonlightInstance::StartStream(std::string host, int httpPort, std
   m_PerformanceStatsEnabled = performanceStats;
 
   // Initialize the rendering surface before starting the connection
-  if (InitializeRenderingSurface(m_StreamConfig.width, m_StreamConfig.height)) {
-    // Start the worker thread to establish the connection
-    pthread_create(&m_ConnectionThread, NULL, MoonlightInstance::ConnectionThreadFunc, this);
+  if (InitializeRenderingSurface(m_StreamConfig.width, m_StreamConfig.height) &&
+      pthread_create(&m_ConnectionThread, NULL, MoonlightInstance::ConnectionThreadFunc, this) == 0) {
+    // The worker thread establishes the connection
+    m_ConnectionThreadStarted = true;
   } else {
-    // Failed to initialize renderer
+    // Failed to initialize renderer or to start the connection
     OnConnectionStopped(0);
   }
 
@@ -517,6 +620,8 @@ void MoonlightInstance::WakeOnLan_private(int callbackId, std::string macAddress
   }
   if (isZeroMac) {
     ClLogMessage("Invalid MAC address: default zero MAC address not allowed: %s\n", macAddress.c_str());
+    // Settle the promise, otherwise the Wake PC dialog keeps waiting for an answer forever
+    PostPromiseMessage(callbackId, "reject", "Invalid MAC address: default zero MAC address not allowed");
     return;
   }
 
@@ -671,11 +776,23 @@ void PostToJs(std::string msg) {
   }, msg.c_str());
 }
 
-void PostToJsAsync(std::string msg) {
-  MAIN_THREAD_ASYNC_EM_ASM({
+// Runs on the main thread and takes ownership of a message copied by PostToJsAsync
+static void DeliverAsyncMessage(char* msg) {
+  MAIN_THREAD_EM_ASM({
     const msg = UTF8ToString($0);
     handleMessage(msg);
-  }, msg.c_str());
+  }, msg);
+  free(msg);
+}
+
+void PostToJsAsync(std::string msg) {
+  // The message must outlive this call, because it is read on the main thread after the caller
+  // has already moved on. Hand a heap copy over, which DeliverAsyncMessage frees once delivered.
+  char* copy = strdup(msg.c_str());
+  if (copy == nullptr) {
+    return;
+  }
+  emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_VI, DeliverAsyncMessage, copy);
 }
 
 void PostPromiseMessage(int callbackId, const std::string& type, const std::string& response) {
