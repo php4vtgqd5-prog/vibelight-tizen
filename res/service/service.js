@@ -1,5 +1,5 @@
 /**
- * Samsung Smart Hub Preview Background Service for Moonlight
+ * Samsung Smart Hub Preview Background Service for VibeLight
  *
  * This Tizen service runs in the background and receives preview data
  * from the main application via message ports, then sets it using
@@ -14,7 +14,7 @@
 /* global tizen, webapis, module */
 
 var packageId = tizen.application.getCurrentApplication().appInfo.packageId;
-var applicationId = packageId + '.MoonlightWasm';
+var applicationId = packageId + '.VibeLight';
 var remoteMessagePort;
 
 var fs = null;

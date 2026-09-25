@@ -49,6 +49,7 @@ var repeatAction = null; // Flag indicating whether the repeat action is set, in
 var lastInvokeTime = 0; // Flag indicating the last invoke time, initial value is 0
 var repeatTimeout = null; // Flag indicating whether the repeat timeout is set, initial value is null
 var navigationTimeout = null; // Flag indicating whether the navigation timeout is set, initial value is null
+const APP_NAME = 'VibeLight'; // Name of the application shown on the home screen
 const BUILD_TYPE = '__BUILD_TYPE__'; // Placeholder for build type, which should be replaced during the build process
 const BUILD_COMMIT = '__BUILD_COMMIT__'; // Placeholder for build commit, which should be replaced during the build process
 var _smartHubLocalMessagePort = null; // Local message port for receiving messages from the Smart Hub service
@@ -65,6 +66,71 @@ const UPDATE_TIMESTAMP = 'lastUpdateCheck'; // Use the update check timestamp ke
 const UPDATE_VERSION = 'latestUpdateVersion'; // // Use the update version key to cache the latest version found
 const UPDATE_INTERVAL = 24 * 60 * 60 * 1000; // Automatic check for updates interval is set to 24 hours
 
+// Title of the current view: null shows the name of the application
+var headerTitleKey = null;
+var headerSubtitle = '';
+
+// Show the title of the current view in the header, with an optional subtitle such as the host name
+function setHeaderTitle(key, subtitle) {
+  headerTitleKey = key;
+  headerSubtitle = subtitle || '';
+  var title = $('#header-title');
+  title.empty();
+  if (key === null) {
+    title.addClass('vl-brand').text(APP_NAME);
+    return;
+  }
+  title.removeClass('vl-brand').append(document.createTextNode(t(key)));
+  if (headerSubtitle) {
+    title.append($('<span>', { class: 'header-subtitle', text: headerSubtitle }));
+  }
+}
+
+// Texts of the interface that are not static, translated again when the language changes
+function refreshDynamicTexts() {
+  setHeaderTitle(headerTitleKey, headerSubtitle);
+  if (typeof hosts === 'object' && hosts) {
+    Object.keys(hosts).forEach(function(hostUid) {
+      updateHostStatusIndicator(hosts[hostUid]);
+    });
+  }
+  updateHeaderStatus();
+}
+
+// Clock and connection type shown in the header
+var headerStatusTimer = null;
+
+function updateHeaderStatus() {
+  var now = new Date();
+  var clock = now.toLocaleTimeString(window.i18n && window.i18n.getLocale ? window.i18n.getLocale() : undefined, { hour: '2-digit', minute: '2-digit' });
+  $('#header-clock').text(clock);
+
+  var icon = 'lan';
+  var offline = false;
+  try {
+    // 0: disconnected, 1: Wi-Fi, 2: cellular, 3: Ethernet
+    var type = webapis.network.getActiveConnectionType();
+    icon = type === 1 ? 'wifi' : (type === 3 ? 'lan' : 'signal_wifi_off');
+    offline = type === 0;
+  } catch (error) {
+    icon = 'lan';
+  }
+  $('#header-network-icon').text(icon).toggleClass('is-offline', offline);
+}
+
+function startHeaderStatus() {
+  updateHeaderStatus();
+  clearInterval(headerStatusTimer);
+  headerStatusTimer = setInterval(updateHeaderStatus, 15000);
+  try {
+    webapis.network.addNetworkStateChangeListener(function() {
+      updateHeaderStatus();
+    });
+  } catch (error) {
+    console.warn('%c[index.js, startHeaderStatus]', 'color: green;', 'Unable to watch the network state: ' + error);
+  }
+}
+
 // Called by the common.js module
 function attachListeners() {
   changeUiModeForWasmLoad();
@@ -72,10 +138,12 @@ function attachListeners() {
   // Register loadSystemInfo to run when language is initialized, and every time it changes
   if (window.i18n && typeof window.i18n.onRefresh === 'function') {
     window.i18n.onRefresh(loadSystemInfo);
+    window.i18n.onRefresh(refreshDynamicTexts);
   } else {
     // Fallback if i18n is not present
     loadSystemInfo();
   }
+  startHeaderStatus();
 
   const i18nInitPromise = (window.i18n && typeof window.i18n.init === 'function')
     ? window.i18n.init().catch((error) => {
@@ -235,7 +303,7 @@ function changeUiModeForWasmLoad() {
   $('#main-content').children().not('#listener, #wasmSpinner').hide();
   $('#wasmSpinner').css('display', 'inline-block');
   $('#wasmSpinnerLogo').show();
-  $('#wasmSpinnerMessage').text(t('Loading Moonlight...'));
+  $('#wasmSpinnerMessage').text(t('Loading VibeLight...'));
 }
 
 function moduleDidLoad() {
@@ -276,38 +344,35 @@ function delayedNavigation(callback) {
 
 // Updates the host status indicator based on the host's online and paired status
 function updateHostStatusIndicator(host) {
-  // Find the desired host cell using the server UUID
-  var hostCell = document.querySelector('#host-' + host.serverUid);
-  var indicator = document.querySelector('#host-status-' + host.serverUid);
-
-  // Update the host cell inactive styling class
-  if (hostCell) {
-    // Check if the host is currently online
-    if (host.online) {
-      // If the host is online, show it as active
-      hostCell.classList.remove('host-cell-inactive');
-    } else {
-      // If the host is offline, show it as inactive
-      hostCell.classList.add('host-cell-inactive');
-    }
-  }
-
-  // If the indicator element is not found, exit the function early
-  if (!indicator) {
+  var hostContainer = document.querySelector('#host-container-' + host.serverUid);
+  var label = document.querySelector('#host-status-' + host.serverUid + ' .host-status-label');
+  if (!hostContainer) {
     return;
   }
-  // Set the appropriate status indicator based on the host status
-  if (host.online === undefined || host.online === null) {
-    indicator.style.display = 'none';
-  } else if (!host.online) {
-    indicator.style.display = 'block';
-    indicator.innerHTML = 'warning';
-  } else if (host.online && !host.paired) {
-    indicator.style.display = 'block';
-    indicator.innerHTML = 'lock';
-  } else {
-    indicator.style.display = 'none';
-    indicator.innerHTML = '';
+
+  // The card shows the status as a colored pill: unknown until the first poll answers
+  var status = 'unknown';
+  if (host.online === true) {
+    status = host.paired ? 'online' : 'unpaired';
+  } else if (host.online === false) {
+    status = 'offline';
+  }
+  hostContainer.setAttribute('data-status', status);
+  if (label) {
+    label.textContent = hostStatusLabel(status);
+  }
+}
+
+function hostStatusLabel(status) {
+  switch (status) {
+    case 'online':
+      return t('Online');
+    case 'offline':
+      return t('Offline');
+    case 'unpaired':
+      return t('Not paired');
+    default:
+      return '';
   }
 }
 
@@ -430,7 +495,7 @@ function snackbarLogLong(...args) {
 // Handle layout elements when displaying the Hosts view
 function showHostsMode() {
   console.log('%c[index.js, showHostsMode]', 'color: green;', 'Entering "Show Hosts" mode.');
-  $('#header-title').html(t('Hosts'));
+  setHeaderTitle(null);
   $('#header-logo').show();
   $('#main-header').show();
   $('.nav-menu-parent').show();
@@ -465,7 +530,7 @@ function showHosts() {
 
   // Hide the main header and content before showing a loading screen
   $('#main-header').children().hide();
-  $('#main-header').css({'backgroundColor': 'transparent', 'boxShadow': 'none'});
+  $('#main-header').addClass('vl-header-bare');
   $('#settings-list, #game-grid').hide();
 
   // Show a spinner while the host list loads
@@ -479,7 +544,7 @@ function showHosts() {
 
     // Show the main header after the loading screen is complete
     $('#main-header').children().show();
-    $('#main-header').css({'backgroundColor': '#333846', 'boxShadow': '0 0 4px 0 rgba(0, 0, 0, 1)'});
+    $('#main-header').removeClass('vl-header-bare');
 
     // Navigate to the Hosts view
     showHostsMode();
@@ -496,7 +561,7 @@ function restoreUiAfterWasmLoad() {
   $('#main-header').children().not('#goBackBtn, #restoreDefaultsBtn, #quitRunningAppBtn').show();
   $('#main-content').children().not('#listener, #wasmSpinner, #settings-list, #game-grid').show();
   $('#wasmSpinner').hide();
-  $('#loadingSpinner').css('display', 'none');
+  hideStreamLoading();
 
   // Navigate to the Hosts view
   Navigation.push(Views.Hosts);
@@ -1197,11 +1262,11 @@ function addHostToGrid(host, ismDNSDiscovered) {
     'aria-label': host.hostname + ' menu'
   });
 
-  // Create the host center icon to indicate the host's status (online/offline/unpaired)
-  var hostStatusIndicator = $('<i>', {
+  // Create the pill that shows the host's status (online/offline/unpaired)
+  var hostStatusIndicator = $('<div>', {
     id: 'host-status-' + host.serverUid,
-    class: 'material-icons host-center-icon'
-  });
+    class: 'host-status-pill'
+  }).append($('<span>', { class: 'host-status-label' }));
 
   // Append the host text to the host title wrapper
   hostTitle.append(hostText);
@@ -1657,7 +1722,7 @@ function appSupportDialog() {
 // Handle layout elements when displaying the Settings view
 function showSettingsMode() {
   console.log('%c[index.js, showSettingsMode]', 'color: green;', 'Entering "Show Settings" mode.');
-  $('#header-title').html(t('Settings'));
+  setHeaderTitle('Settings');
   $('#header-logo').show();
   $('#main-header').show();
   $('#goBackBtn').show();
@@ -1677,10 +1742,6 @@ function showSettingsMode() {
 
   stopPollingHosts();
   Navigation.start();
-  // Register showSettingsMode to re-run every time the language changes
-  if (window.i18n && typeof window.i18n.onRefresh === 'function') {
-    window.i18n.onRefresh(showSettingsMode);
-  }
 }
 
 // Show the Settings list
@@ -1690,7 +1751,7 @@ function showSettings() {
 
   // Hide the main header and content before showing a loading screen
   $('#main-header').children().hide();
-  $('#main-header').css({'backgroundColor': 'transparent', 'boxShadow': 'none'});
+  $('#main-header').addClass('vl-header-bare');
   $('#host-grid, #game-grid').hide();
 
   // Show a spinner while the setting list loads
@@ -1704,7 +1765,7 @@ function showSettings() {
 
     // Show the main header after the loading screen is complete
     $('#main-header').children().show();
-    $('#main-header').css({'backgroundColor': '#333846', 'boxShadow': '0 0 4px 0 rgba(0, 0, 0, 1)'});
+    $('#main-header').removeClass('vl-header-bare');
 
     // Show the settings list section
     $('#settings-list').removeClass('hide-container');
@@ -1828,8 +1889,8 @@ function navigationGuideDialog() {
 // Fetch the latest version and release notes from GitHub API
 function fetchLatestRelease() {
   // GitHub API endpoint to get the latest released version
-  const repoOwner = 'brightcraft';
-  const repoName = 'moonlight-tizen';
+  const repoOwner = 'php4vtgqd5-prog';
+  const repoName = 'vibelight-tizen';
   const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`;
 
   // Fetch the latest release data from the GitHub API
@@ -2019,7 +2080,7 @@ function updateAppDialog(latestVersion, releaseNotes) {
 // Check for updates when the Check for Updates button is pressed
 function checkForAppUpdates() {
   console.log('%c[index.js, checkForAppUpdates]', 'color: green;', 'Checking for new application updates...');
-  snackbarLog('Checking for available Moonlight updates...');
+  snackbarLog('Checking for available VibeLight updates...');
   // Fetch the latest release data from the GitHub API
   fetchLatestRelease().then(({ latestVersion, releaseNotes }) => {
     setTimeout(() => {
@@ -2239,7 +2300,7 @@ function restartAppDialog() {
   var restartAppDialog = document.querySelector('#restartAppDialog');
 
   // Change the dialog text element to confirm whether the user wants to restart the application
-  document.getElementById('restartAppDialogText').innerHTML = t('Are you sure you want to restart Moonlight?');
+  document.getElementById('restartAppDialogText').innerHTML = t('Are you sure you want to restart VibeLight?');
 
   // Show the dialog and push the view
   restartAppDialogOverlay.style.display = 'flex';
@@ -2365,9 +2426,11 @@ function stylizeBoxArts(freshApi, appsList) {
     // If the game is currently running, then apply CSS stylization
     if (freshApi.currentGame === app.id) {
       appBox.classList.add('current-game-active');
+      appBox.setAttribute('data-status-label', t('Running'));
       appBox.title = app.title + t(' (Running)');
     } else {
       appBox.classList.remove('current-game-active');
+      appBox.removeAttribute('data-status-label');
       appBox.title = app.title;
     }
   });
@@ -2393,7 +2456,7 @@ function sortTitles(list, sortOrder) {
 // Handle layout elements when displaying the Apps view
 function showAppsMode() {
   console.log('%c[index.js, showAppsMode]', 'color: green;', 'Entering "Show Apps" mode.');
-  $('#header-title').html(t('Apps'));
+  setHeaderTitle('Apps', api ? api.hostname : '');
   $('#header-logo').show();
   $('#main-header').show();
   $('#goBackBtn').show();
@@ -2410,8 +2473,8 @@ function showAppsMode() {
   $('#performance-stats').css('display', 'none');
   $('#main-content').removeClass('fullscreen');
   $('#listener').removeClass('fullscreen');
-  $('#loadingSpinner').css('display', 'none');
-  $('body').css('backgroundColor', '#282C38');
+  hideStreamLoading();
+  $('body').removeClass('vl-streaming');
   $('#wasm_module').css('display', 'none');
 
   isInGame = false;
@@ -2441,7 +2504,7 @@ function showApps(host) {
 
     // Hide the main header before showing a loading screen
     $('#main-header').children().hide();
-    $('#main-header').css({'backgroundColor': 'transparent', 'boxShadow': 'none'});
+    $('#main-header').addClass('vl-header-bare');
     $('#host-grid, #settings-list').hide();
 
     // Show a spinner while the app list loads
@@ -2460,7 +2523,7 @@ function showApps(host) {
 
         // Show the main header after the loading screen is complete
         $('#main-header').children().show();
-        $('#main-header').css({'backgroundColor': '#333846', 'boxShadow': '0 0 4px 0 rgba(0, 0, 0, 1)'});
+        $('#main-header').removeClass('vl-header-bare');
 
         // Show the game grid section
         $('#game-grid').show();
@@ -2678,7 +2741,7 @@ function showApps(host) {
 
         // Show the main header after the loading screen is complete
         $('#main-header').children().show();
-        $('#main-header').css({'backgroundColor': '#333846', 'boxShadow': '0 0 4px 0 rgba(0, 0, 0, 1)'});
+        $('#main-header').removeClass('vl-header-bare');
 
         console.error('%c[index.js, showApps]', 'color: green;', 'Error: Failed to get app list from ' + host.hostname + '. Host object: ', host, '\n' + host.toString()); // Logging both object (for console) and toString-ed object (for text logs)
         var errorAppListImg = new Image();
@@ -2743,14 +2806,37 @@ function quitAppDialog() {
   }
 }
 
+// Show the loading screen of a stream, over the box art of its app when it was loaded
+function showStreamLoading(appId) {
+  var img = appId !== undefined && appId !== null ? document.querySelector('#game-container-' + appId + ' img') : null;
+  var art = img ? img.getAttribute('src') : '';
+  if (art) {
+    var url = 'url("' + art.replace(/"/g, '%22') + '")';
+    $('#loadingSpinnerArt').css('backgroundImage', url).show();
+    $('#streamLoadingBackdropArt').css('backgroundImage', url);
+    $('#streamLoadingBackdrop').addClass('has-art');
+  } else {
+    $('#loadingSpinnerArt').hide().css('backgroundImage', '');
+    $('#streamLoadingBackdropArt').css('backgroundImage', '');
+    $('#streamLoadingBackdrop').removeClass('has-art');
+  }
+  $('#streamLoadingBackdrop').show();
+  $('#loadingSpinner').css('display', 'inline-block');
+}
+
+function hideStreamLoading() {
+  $('#loadingSpinner').css('display', 'none');
+  $('#streamLoadingBackdrop').hide();
+}
+
 // Handle layout elements when displaying the Stream view
-function showStreamMode() {
+function showStreamMode(appId) {
   console.log('%c[index.js, showStreamMode]', 'color: green;', 'Entering "Show Stream" mode.');
   $('#main-header').hide();
   $('#main-content').children().not('#listener, #loadingSpinner').hide();
   $('#main-content').addClass('fullscreen');
   $('#listener').addClass('fullscreen');
-  $('#loadingSpinner').css('display', 'inline-block');
+  showStreamLoading(appId);
 
   isInGame = true;
   fullscreenWasmModule();
@@ -2893,7 +2979,7 @@ function startGame(host, appID, overrides) {
       $('#connection-warnings').removeClass('is-active').text('');
       $('#loadingSpinnerMessage').text(t('Starting %1$s...', appToStart.title));
       $('#loadingSpinnerDetail').text(AutoTune.isEnabled() ? t('Auto-Tune is checking the connection to %1$s...', host.hostname) : '');
-      showStreamMode();
+      showStreamMode(appID);
 
       // Resolve the stream configuration from the settings, or from Auto-Tune
       prepareStreamConfig(host, overrides).then(function(config) {
@@ -4430,7 +4516,7 @@ function waitForHostAndNavigate(serverUid) {
     } else if (!host && isHostsLoaded) {
       clearInterval(interval);
       console.warn('%c[index.js, waitForHostAndNavigate]', 'color: orange;', 'Host ' + serverUid + ' no longer exists in Moonlight.');
-      snackbarLogLong('The selected host is no longer available on Moonlight.');
+      snackbarLogLong('The selected host is no longer available on VibeLight.');
       if (typeof updatePreviewData === 'function') updatePreviewData();
     } else if (attempts > 30) {
       clearInterval(interval);
@@ -4539,7 +4625,7 @@ function waitForHostAndNavigateToApp(serverUid, appId) {
     } else if (!host && isHostsLoaded) {
       clearInterval(interval);
       console.warn('%c[index.js, waitForHostAndNavigateToApp]', 'color: orange;', 'Host ' + serverUid + ' no longer exists in Moonlight.');
-      snackbarLogLong('The selected host is no longer available on Moonlight.');
+      snackbarLogLong('The selected host is no longer available on VibeLight.');
       if (typeof updatePreviewData === 'function') updatePreviewData();
     } else if (attempts > 30) { // 30s timeout
       clearInterval(interval);

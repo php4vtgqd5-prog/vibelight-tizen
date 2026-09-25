@@ -276,8 +276,8 @@ function handleMessage(msg) {
     if (restart) {
       // Stay on the stream screen and start the stream again once the WASM module is ready
       $('#wasm_module').css('display', 'none');
-      $('body').css('backgroundColor', '#282C38');
-      $('#loadingSpinner').css('display', 'inline-block');
+      $('body').removeClass('vl-streaming');
+      showStreamLoading(restart.appId);
       $('#loadingSpinnerMessage').text(restart.message);
       $('#loadingSpinnerDetail').text('');
       var restartToken = streamStartToken;
@@ -292,8 +292,8 @@ function handleMessage(msg) {
     AutoTune.endReconnectSequence();
     // Remove the video stream now
     $('#listener').removeClass('fullscreen');
-    $('#loadingSpinner').css('display', 'none');
-    $('body').css('backgroundColor', '#282C38');
+    hideStreamLoading();
+    $('body').removeClass('vl-streaming');
     $('#wasm_module').css('display', 'none');
     switch (errorCode) {
       case 0: // ML_ERROR_GRACEFUL_TERMINATION
@@ -360,8 +360,8 @@ function handleMessage(msg) {
   } else if (msg === 'Connection Established') {
     StreamSessionStats.connected();
     // Prepare the screen for video stream
-    $('#loadingSpinner').css('display', 'none');
-    $('body').css('backgroundColor', 'transparent');
+    hideStreamLoading();
+    $('body').addClass('vl-streaming');
     $('#wasm_module').css('display', '');
     $('#wasm_module').focus();
   } else if (msg.indexOf('ProgressMsg: ') === 0) {

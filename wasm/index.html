@@ -5,7 +5,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="-1">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="Moonlight Game Streaming">Moonlight Game Streaming</title>
+  <title>VibeLight</title>
   <link rel="icon" href="static/favicon/favicon.png">
   <link rel="stylesheet" href="static/css/roboto.css">
   <link rel="stylesheet" href="static/css/material-icons.css">
@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="static/css/style.css">
   <script type="text/javascript" src="platform.js"></script>
 </head>
-<body data-name="moonlight-tizen" data-tools="emscripten" data-configs="Debug Release" data-path="{tc}/{config}">
+<body data-name="vibelight-tizen" data-tools="emscripten" data-configs="Debug Release" data-path="{tc}/{config}">
   <div class="mdl-layout mdl-js-layout">
     <header id="main-header" class="mdl-layout__header">
       <div class="mdl-layout__header-row">
@@ -22,10 +22,15 @@
         </button>
         <div id="goBackTooltip" class="mdl-tooltip" for="goBackBtn" data-i18n="Back">Back</div>
         <!-- Header logo and title -->
-        <img src="static/res/ic_moonlight_logo.svg" id="header-logo">
-        <span id="header-title" class="mdl-layout-title" data-i18n="Moonlight">Moonlight</span>
+        <img src="static/res/ic_vibelight_logo.svg" id="header-logo">
+        <span id="header-title" class="mdl-layout-title vl-brand">VibeLight</span>
         <!-- Add spacer to align navigation to the right -->
         <div class="mdl-layout-spacer"></div>
+        <!-- Connection type and clock -->
+        <div id="header-status" aria-hidden="true">
+          <i id="header-network-icon" class="material-icons">lan</i>
+          <span id="header-clock"></span>
+        </div>
         <!-- Navigation bar -->
         <nav class="mdl-navigation">
           <button type="button" id="settingsBtn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect" role="link" aria-label="Settings">
@@ -110,8 +115,8 @@
               <label><span data-i18n="Automatic stream settings">Automatic stream settings</span>
                 <span class="badge badge-new" data-i18n="New">New</span>
               </label>
-              <span class="mdl-list__item-text-body" data-i18n="- Auto-Tune chooses the resolution, frame rate, bitrate and codec of every stream from what your TV, your host and your network can handle.">
-                - Auto-Tune chooses the resolution, frame rate, bitrate and codec of every stream from what your TV, your host and your network can handle.
+              <span class="mdl-list__item-text-body" data-i18n="Auto-Tune chooses the resolution, frame rate, bitrate and codec of every stream from what your TV, your host and your network can handle.">
+                Auto-Tune chooses the resolution, frame rate, bitrate and codec of every stream from what your TV, your host and your network can handle.
               </span>
               <div id="autoTuneMenu">
                 <label id="autoTuneBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="autoTuneSwitch">
@@ -124,8 +129,8 @@
             </div>
             <div id="autoTuneGoalOption" class="setting-option">
               <label data-i18n="Optimization goal">Optimization goal</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Balanced suits most games, Best quality favors resolution and bitrate, Lowest latency favors frame rate and response time.">
-                - Balanced suits most games, Best quality favors resolution and bitrate, Lowest latency favors frame rate and response time.
+              <span class="mdl-list__item-text-body" data-i18n="Balanced suits most games, Best quality favors resolution and bitrate, Lowest latency favors frame rate and response time.">
+                Balanced suits most games, Best quality favors resolution and bitrate, Lowest latency favors frame rate and response time.
               </span>
               <div id="autoTuneGoalMenu">
                 <button type="button" id="selectAutoTuneGoal" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="balanced" data-select-menu="autoTuneGoalMenu" data-i18n="Balanced">Balanced</button>
@@ -138,8 +143,8 @@
             </div>
             <div id="autoTuneLearnOption" class="setting-option">
               <label data-i18n="Learn from sessions">Learn from sessions</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Uses the statistics of your sessions to find the highest bitrate your network sustains with each host.">
-                - Uses the statistics of your sessions to find the highest bitrate your network sustains with each host.
+              <span class="mdl-list__item-text-body" data-i18n="Uses the statistics of your sessions to find the highest bitrate your network sustains with each host.">
+                Uses the statistics of your sessions to find the highest bitrate your network sustains with each host.
               </span>
               <div id="autoTuneLearnMenu">
                 <label id="autoTuneLearnBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="autoTuneLearnSwitch">
@@ -152,8 +157,8 @@
             </div>
             <div id="adaptiveReconnectOption" class="setting-option">
               <label data-i18n="Adaptive reconnect">Adaptive reconnect</label>
-              <span class="mdl-list__item-text-body" data-i18n="- When the connection stays poor for several seconds, reconnects with a lower bitrate (at most twice per session).">
-                - When the connection stays poor for several seconds, reconnects with a lower bitrate (at most twice per session).
+              <span class="mdl-list__item-text-body" data-i18n="When the connection stays poor for several seconds, reconnects with a lower bitrate (at most twice per session).">
+                When the connection stays poor for several seconds, reconnects with a lower bitrate (at most twice per session).
               </span>
               <div id="adaptiveReconnectMenu">
                 <label id="adaptiveReconnectBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="adaptiveReconnectSwitch">
@@ -166,8 +171,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Test my setup">Test my setup</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Checks your TV and measures the connection to your hosts, then shows the settings Auto-Tune recommends.">
-                - Checks your TV and measures the connection to your hosts, then shows the settings Auto-Tune recommends.
+              <span class="mdl-list__item-text-body" data-i18n="Checks your TV and measures the connection to your hosts, then shows the settings Auto-Tune recommends.">
+                Checks your TV and measures the connection to your hosts, then shows the settings Auto-Tune recommends.
               </span>
               <div id="runAutoTuneMenu">
                 <button type="button" id="runAutoTuneBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Test my setup">
@@ -180,8 +185,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Reset what Auto-Tune learned">Reset what Auto-Tune learned</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Useful after changing your router, network cables or the place of your TV.">
-                - Useful after changing your router, network cables or the place of your TV.
+              <span class="mdl-list__item-text-body" data-i18n="Useful after changing your router, network cables or the place of your TV.">
+                Useful after changing your router, network cables or the place of your TV.
               </span>
               <div id="resetAutoTuneMenu">
                 <button type="button" id="resetAutoTuneBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Reset Auto-Tune">
@@ -200,8 +205,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Video resolution">Video resolution</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Increase to improve image clarity or decrease for better performance on lower-end devices and slower networks.">
-                - Increase to improve image clarity or decrease for better performance on lower-end devices and slower networks.
+              <span class="mdl-list__item-text-body" data-i18n="Increase to improve image clarity or decrease for better performance on lower-end devices and slower networks.">
+                Increase to improve image clarity or decrease for better performance on lower-end devices and slower networks.
               </span>
               <div id="videoResolutionMenu">
                 <button type="button" id="selectResolution" class="mdl-button mdl-js-button mdl-js-ripple-effect" data-value="1280:720" data-i18n="1280 x 720 (720p)">1280 x 720 (720p)</button>
@@ -216,8 +221,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Video frame rate">Video frame rate</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Increase for smoother video stream or decrease for better performance on lower-end devices.">
-                - Increase for smoother video stream or decrease for better performance on lower-end devices.
+              <span class="mdl-list__item-text-body" data-i18n="Increase for smoother video stream or decrease for better performance on lower-end devices.">
+                Increase for smoother video stream or decrease for better performance on lower-end devices.
               </span>
               <div id="videoFramerateMenu">
                 <button type="button" id="selectFramerate" class="mdl-button mdl-js-button mdl-js-ripple-effect" data-value="60" data-i18n="60 FPS">60 FPS</button>
@@ -229,8 +234,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Video bitrate">Video bitrate</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Increase for better image quality or decrease to improve performance on slower connections.">
-                - Increase for better image quality or decrease to improve performance on slower connections.
+              <span class="mdl-list__item-text-body" data-i18n="Increase for better image quality or decrease to improve performance on slower connections.">
+                Increase for better image quality or decrease to improve performance on slower connections.
               </span>
               <div id="videoBitrateMenu">
                 <button type="button" id="selectBitrate" class="mdl-button mdl-js-button mdl-js-ripple-effect">10 Mbps</button>
@@ -243,8 +248,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Video frame pacing">Video frame pacing</label>
-              <span class="mdl-list__item-text-body" data-i18n="- This can help reduce micro-stutter by delaying frames that arrive too early while streaming.">
-                - This can help reduce micro-stutter by delaying frames that arrive too early while streaming.
+              <span class="mdl-list__item-text-body" data-i18n="This can help reduce micro-stutter by delaying frames that arrive too early while streaming.">
+                This can help reduce micro-stutter by delaying frames that arrive too early while streaming.
               </span>
               <div id="videoFramePacingMenu">
                 <label id="framePacingBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="framePacingSwitch">
@@ -259,8 +264,8 @@
           <div id="interfaceSettings" class="settings-options">
             <div class="setting-option">
               <label data-i18n="Language">Language</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Choose Auto to match your TV locale, or manually select your desired language from the list.">
-                - Choose Auto to match your TV locale, or manually select your desired language from the list.
+              <span class="mdl-list__item-text-body" data-i18n="Choose Auto to match your TV locale, or manually select your desired language from the list.">
+                Choose Auto to match your TV locale, or manually select your desired language from the list.
               </span>
               <div id="languageMenu">
                 <button type="button" id="selectLanguage" class="mdl-button mdl-js-button mdl-js-ripple-effect" data-value="auto">Auto</button>
@@ -269,8 +274,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Host address field mode">Host address field mode</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Recommended for devices that have issues with the TV keyboard when entering the host address.">
-                - Recommended for devices that have issues with the TV keyboard when entering the host address.
+              <span class="mdl-list__item-text-body" data-i18n="Recommended for devices that have issues with the TV keyboard when entering the host address.">
+                Recommended for devices that have issues with the TV keyboard when entering the host address.
               </span>
               <div id="ipAddressFieldModeMenu">
                 <label id="ipAddressFieldModeBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="ipAddressFieldModeSwitch">
@@ -285,8 +290,8 @@
           <div id="hostSettings" class="settings-options">
             <div class="setting-option">
               <label data-i18n="Sort the list of apps">Sort the list of apps</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Sorts the list of host apps from ascending order (A to Z) to descending order (Z to A) based on their titles.">
-                - Sorts the list of host apps from ascending order (A to Z) to descending order (Z to A) based on their titles.
+              <span class="mdl-list__item-text-body" data-i18n="Sorts the list of host apps from ascending order (A to Z) to descending order (Z to A) based on their titles.">
+                Sorts the list of host apps from ascending order (A to Z) to descending order (Z to A) based on their titles.
               </span>
               <div id="sortAppsListMenu">
                 <label id="sortAppsListBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="sortAppsListSwitch">
@@ -299,8 +304,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Optimize game settings">Optimize game settings</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Adjusts the host resolution to match the client resolution when the display device is configured on Sunshine.">
-                - Adjusts the host resolution to match the client resolution when the display device is configured on Sunshine.
+              <span class="mdl-list__item-text-body" data-i18n="Adjusts the host resolution to match the client resolution when the display device is configured on Sunshine.">
+                Adjusts the host resolution to match the client resolution when the display device is configured on Sunshine.
               </span>
               <div id="optimizeGamesMenu">
                 <label id="optimizeGamesBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="optimizeGamesSwitch">
@@ -377,8 +382,8 @@
           <div id="audioSettings" class="settings-options">
             <div class="setting-option">
               <label data-i18n="Audio backend">Audio backend</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Choose EMSS for the original implementation or Web Audio if you hear crackling or stuttering while streaming.">
-                - Choose EMSS for the original implementation or Web Audio if you hear crackling or stuttering while streaming.
+              <span class="mdl-list__item-text-body" data-i18n="Choose EMSS for the original implementation or Web Audio if you hear crackling or stuttering while streaming.">
+                Choose EMSS for the original implementation or Web Audio if you hear crackling or stuttering while streaming.
               </span>
               <div id="audioBackendMenu">
                 <button type="button" id="selectAudioBackend" class="mdl-button mdl-js-button mdl-js-ripple-effect" data-value="EMSS" data-i18n="EMSS">EMSS</button>
@@ -392,8 +397,8 @@
               <label><span data-i18n="Audio configuration">Audio configuration</span>
                 <span class="badge badge-experimental" data-i18n="Experimental">Experimental</span>
               </label>
-              <span class="mdl-list__item-text-body" data-i18n="- Choose 5.1 or 7.1 surround sound for home-theater systems or use Stereo for general audio compatibility.">
-                - Choose 5.1 or 7.1 surround sound for home-theater systems or use Stereo for general audio compatibility.
+              <span class="mdl-list__item-text-body" data-i18n="Choose 5.1 or 7.1 surround sound for home-theater systems or use Stereo for general audio compatibility.">
+                Choose 5.1 or 7.1 surround sound for home-theater systems or use Stereo for general audio compatibility.
               </span>
               <div id="audioConfigMenu">
                 <button type="button" id="selectAudio" class="mdl-button mdl-js-button mdl-js-ripple-effect" data-value="Stereo" data-i18n="Stereo">Stereo</button>
@@ -406,8 +411,8 @@
             </div>
             <div id="audioSyncOption" class="setting-option">
               <label data-i18n="Audio synchronization">Audio synchronization</label>
-              <span class="mdl-list__item-text-body" data-i18n="- This can help reduce delays by keeping audio in sync for a consistent sound while streaming.">
-                - This can help reduce delays by keeping audio in sync for a consistent sound while streaming.
+              <span class="mdl-list__item-text-body" data-i18n="This can help reduce delays by keeping audio in sync for a consistent sound while streaming.">
+                This can help reduce delays by keeping audio in sync for a consistent sound while streaming.
               </span>
               <div id="audioSyncMenu">
                 <label id="audioSyncBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="audioSyncSwitch">
@@ -420,8 +425,8 @@
             </div>
             <div id="audioJitterOption" class="setting-option">
               <label data-i18n="Audio jitter buffer">Audio jitter buffer</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Increase to keep the sound smooth over an unstable network or decrease to lower the audio delay.">
-                - Increase to keep the sound smooth over an unstable network or decrease to lower the audio delay.
+              <span class="mdl-list__item-text-body" data-i18n="Increase to keep the sound smooth over an unstable network or decrease to lower the audio delay.">
+                Increase to keep the sound smooth over an unstable network or decrease to lower the audio delay.
               </span>
               <div id="audioJitterMenu">
                 <button type="button" id="selectAudioJitter" class="mdl-button mdl-js-button mdl-js-ripple-effect">100 ms</button>
@@ -452,8 +457,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Video codec">Video codec</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Increase for better video compression and quality or decrease to improve performance on lower-end devices.">
-                - Increase for better video compression and quality or decrease to improve performance on lower-end devices.
+              <span class="mdl-list__item-text-body" data-i18n="Increase for better video compression and quality or decrease to improve performance on lower-end devices.">
+                Increase for better video compression and quality or decrease to improve performance on lower-end devices.
               </span>
               <div id="videoCodecMenu">
                 <button type="button" id="selectCodec" class="mdl-button mdl-js-button mdl-js-ripple-effect" data-value="H264" data-i18n="H.264">H.264</button>
@@ -466,8 +471,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Video HDR">Video HDR</label>
-              <span class="mdl-list__item-text-body" data-i18n="- HDR requires an HDR10-capable device, a GPU that can encode HEVC Main 10, and HDR10-enabled game.">
-                - HDR requires an HDR10-capable device, a GPU that can encode HEVC Main 10, and HDR10-enabled game.
+              <span class="mdl-list__item-text-body" data-i18n="HDR requires an HDR10-capable device, a GPU that can encode HEVC Main 10, and HDR10-enabled game.">
+                HDR requires an HDR10-capable device, a GPU that can encode HEVC Main 10, and HDR10-enabled game.
               </span>
               <div id="videoHdrMenu">
                 <label id="hdrModeBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="hdrModeSwitch">
@@ -480,8 +485,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Color range">Color range</label>
-              <span class="mdl-list__item-text-body" data-i18n="- This will cause loss of detail in light and dark areas if your device doesn't properly display full range video content.">
-                - This will cause loss of detail in light and dark areas if your device doesn't properly display full range video content.
+              <span class="mdl-list__item-text-body" data-i18n="This will cause loss of detail in light and dark areas if your device doesn't properly display full range video content.">
+                This will cause loss of detail in light and dark areas if your device doesn't properly display full range video content.
               </span>
               <div id="colorRangeMenu">
                 <label id="fullRangeBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="fullRangeSwitch">
@@ -494,8 +499,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Game mode">Game mode</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Enable for ultra low latency with game mode or disable for low latency with post-processing video enhancements.">
-                - Enable for ultra low latency with game mode or disable for low latency with post-processing video enhancements.
+              <span class="mdl-list__item-text-body" data-i18n="Enable for ultra low latency with game mode or disable for low latency with post-processing video enhancements.">
+                Enable for ultra low latency with game mode or disable for low latency with post-processing video enhancements.
               </span>
               <div id="gameModeMenu">
                 <label id="gameModeBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="gameModeSwitch">
@@ -512,8 +517,8 @@
               <label><span data-i18n="Unlock all frame rates">Unlock all frame rates</span>
                 <span class="badge badge-experimental" data-i18n="Experimental">Experimental</span>
               </label>
-              <span class="mdl-list__item-text-body" data-i18n="- Higher FPS can reduce latency on high-end devices, but may cause lag or instability on unsupported devices.">
-                - Higher FPS can reduce latency on high-end devices, but may cause lag or instability on unsupported devices.
+              <span class="mdl-list__item-text-body" data-i18n="Higher FPS can reduce latency on high-end devices, but may cause lag or instability on unsupported devices.">
+                Higher FPS can reduce latency on high-end devices, but may cause lag or instability on unsupported devices.
               </span>
               <div id="unlockAllFpsMenu">
                 <label id="unlockAllFpsBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="unlockAllFpsSwitch">
@@ -526,8 +531,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Optimize bitrate presets">Optimize bitrate presets</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Calculates bitrate based on selected resolution, frame rate, codec, and HDR settings to determine the optimal value.">
-                - Calculates bitrate based on selected resolution, frame rate, codec, and HDR settings to determine the optimal value.
+              <span class="mdl-list__item-text-body" data-i18n="Calculates bitrate based on selected resolution, frame rate, codec, and HDR settings to determine the optimal value.">
+                Calculates bitrate based on selected resolution, frame rate, codec, and HDR settings to determine the optimal value.
               </span>
               <div id="optimizeBitrateMenu">
                 <label id="optimizeBitrateBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="optimizeBitrateSwitch">
@@ -556,8 +561,8 @@
               <label><span data-i18n="Statistics overlay">Statistics overlay</span>
                 <span class="badge badge-new" data-i18n="New">New</span>
               </label>
-              <span class="mdl-list__item-text-body" data-i18n="- Shows live stream statistics while streaming. Press YELLOW on the remote to switch between the modes at any time.">
-                - Shows live stream statistics while streaming. Press YELLOW on the remote to switch between the modes at any time.
+              <span class="mdl-list__item-text-body" data-i18n="Shows live stream statistics while streaming. Press YELLOW on the remote to switch between the modes at any time.">
+                Shows live stream statistics while streaming. Press YELLOW on the remote to switch between the modes at any time.
               </span>
               <div id="statsOverlayMenu">
                 <button type="button" id="selectStatsOverlay" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="off" data-select-menu="statsOverlayMenu" data-i18n="Off">Off</button>
@@ -571,8 +576,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Overlay position">Overlay position</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Choose the corner of the screen where the statistics overlay is shown.">
-                - Choose the corner of the screen where the statistics overlay is shown.
+              <span class="mdl-list__item-text-body" data-i18n="Choose the corner of the screen where the statistics overlay is shown.">
+                Choose the corner of the screen where the statistics overlay is shown.
               </span>
               <div id="statsPositionMenu">
                 <button type="button" id="selectStatsPosition" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="tl" data-select-menu="statsPositionMenu" data-i18n="Top left">Top left</button>
@@ -586,8 +591,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Session summary">Session summary</label>
-              <span class="mdl-list__item-text-body" data-i18n="- After each stream, shows its quality score with the average frame rate, bitrate, latency and frame loss.">
-                - After each stream, shows its quality score with the average frame rate, bitrate, latency and frame loss.
+              <span class="mdl-list__item-text-body" data-i18n="After each stream, shows its quality score with the average frame rate, bitrate, latency and frame loss.">
+                After each stream, shows its quality score with the average frame rate, bitrate, latency and frame loss.
               </span>
               <div id="sessionSummaryMenu">
                 <label id="sessionSummaryBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="sessionSummarySwitch">
@@ -600,8 +605,8 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Session history">Session history</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Review the statistics of your last streaming sessions.">
-                - Review the statistics of your last streaming sessions.
+              <span class="mdl-list__item-text-body" data-i18n="Review the statistics of your last streaming sessions.">
+                Review the statistics of your last streaming sessions.
               </span>
               <div id="sessionHistoryMenu">
                 <button type="button" id="sessionHistoryBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Session History">
@@ -622,9 +627,15 @@
               </div>
             </div>
             <div class="setting-option">
+              <label data-i18n="Credits">Credits</label>
+              <span class="mdl-list__item-text-body" data-i18n="VibeLight is based on Moonlight for Tizen by brightcraft, the Moonlight project and the Samsung Developers WASM port. It is free software under the GNU GPL v3.">
+                VibeLight is based on Moonlight for Tizen by brightcraft, the Moonlight project and the Samsung Developers WASM port. It is free software under the GNU GPL v3.
+              </span>
+            </div>
+            <div class="setting-option">
               <label data-i18n="Navigation guide">Navigation guide</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Useful for users who need guidance or help navigating the app.">
-                - Useful for users who need guidance or help navigating the app.
+              <span class="mdl-list__item-text-body" data-i18n="Useful for users who need guidance or help navigating the app.">
+                Useful for users who need guidance or help navigating the app.
               </span>
               <div id="navigationGuideMenu">
                 <button type="button" id="navigationGuideBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect" aria-label="Navigation Guide">
@@ -637,13 +648,13 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Check for updates">Check for updates</label>
-              <span class="mdl-list__item-text-body" data-i18n="- Find out if a new application update is available.">
-                - Find out if a new application update is available.
+              <span class="mdl-list__item-text-body" data-i18n="Find out if a new application update is available.">
+                Find out if a new application update is available.
               </span>
               <div id="checkForUpdatesMenu">
                 <button type="button" id="checkUpdatesBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect" aria-label="Check for Updates">
-                  <span data-i18n="Check for new Moonlight updates">
-                    Check for new Moonlight updates
+                  <span data-i18n="Check for new VibeLight updates">
+                    Check for new VibeLight updates
                   </span>
                   <img src="static/res/ic_system_update_alt_48px.svg" id="checkUpdatesIcon">
                 </button>
@@ -651,13 +662,13 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Restart the application">Restart the application</label>
-              <span class="mdl-list__item-text-body" data-i18n="- If you encounter issues, here you can restart the app to resolve them.">
-                - If you encounter issues, here you can restart the app to resolve them.
+              <span class="mdl-list__item-text-body" data-i18n="If you encounter issues, here you can restart the app to resolve them.">
+                If you encounter issues, here you can restart the app to resolve them.
               </span>
               <div id="restartAppMenu">
                 <button type="button" id="restartAppBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect" aria-label="Restart Application">
-                  <span data-i18n="Restart the Moonlight app quickly">
-                    Restart the Moonlight app quickly
+                  <span data-i18n="Restart the VibeLight app quickly">
+                    Restart the VibeLight app quickly
                   </span>
                   <img src="static/res/ic_restart_alt_48px.svg" id="restartApplicationIcon">
                 </button>
@@ -669,15 +680,19 @@
       <div id="game-grid"></div>
       <div id="listener"></div>
       <!-- Wasm module placeholder, Wasm gets thrown into here -->
-      <div id="wasmSpinner" class="mdl-progress mdl-js-progress mdl-progress__indeterminate">
-        <img src="static/res/ic_moonlight_logo.svg" id="wasmSpinnerLogo">
+      <div id="wasmSpinner" class="mdl-progress mdl-js-progress mdl-progress--indeterminate mdl-progress__indeterminate">
+        <img src="static/res/ic_vibelight_logo.svg" id="wasmSpinnerLogo">
         <h4 id="wasmSpinnerMessage"></h4>
       </div>
-      <div id="loadingSpinner" class="mdl-progress mdl-js-progress mdl-progress__indeterminate">
+      <div id="loadingSpinner" class="mdl-progress mdl-js-progress mdl-progress--indeterminate mdl-progress__indeterminate">
+        <div id="loadingSpinnerArt"></div>
         <h4 id="loadingSpinnerMessage"></h4>
         <p id="loadingSpinnerDetail"></p>
+        <p id="loadingSpinnerHint"><span class="remote-key remote-key-red"></span><span data-i18n="Cancel">Cancel</span></p>
       </div>
     </main>
+    <!-- Box art of the app behind the loading screen of a stream -->
+    <div id="streamLoadingBackdrop"><div id="streamLoadingBackdropArt"></div></div>
     <div id="connection-warnings"></div>
     <div id="performance-stats"></div>
   </div>
@@ -802,11 +817,11 @@
   </div>
   <div id="appSupportDialogOverlay" class="dialog-overlay">
     <dialog id="appSupportDialog" class="mdl-dialog">
-      <h3 id="appSupportDialogTitle" class="mdl-dialog__title" data-i18n="Moonlight Support">Moonlight Support</h3>
+      <h3 id="appSupportDialogTitle" class="mdl-dialog__title" data-i18n="VibeLight Support">VibeLight Support</h3>
       <div class="mdl-dialog__content">
         <p id="appSupportDialogText">
-          <span data-i18n="If you're facing any problems with Moonlight, visit our comprehensive guide.">
-            If you're facing any problems with Moonlight, visit our comprehensive guide.
+          <span data-i18n="If you're facing any problems with VibeLight, visit the guide.">
+            If you're facing any problems with VibeLight, visit the guide.
           </span><br><br>
           <span data-i18n="Scan the QR code below to access an in-depth setup guide, troubleshooting tips, frequently asked questions, and more.">
             Scan the QR code below to access an in-depth setup guide, troubleshooting tips, frequently asked questions, and more.
@@ -924,7 +939,7 @@
   </div>
   <div id="updateAppDialogOverlay" class="dialog-overlay">
     <dialog id="updateAppDialog" class="mdl-dialog">
-      <h3 id="updateAppDialogTitle" class="mdl-dialog__title" data-i18n="Update Moonlight">Update Moonlight</h3>
+      <h3 id="updateAppDialogTitle" class="mdl-dialog__title" data-i18n="Update VibeLight">Update VibeLight</h3>
       <div class="mdl-dialog__content">
         <p id="updateAppDialogText"></p>
       </div>
@@ -935,10 +950,10 @@
   </div>
   <div id="restartAppDialogOverlay" class="dialog-overlay">
     <dialog id="restartAppDialog" class="mdl-dialog">
-      <h3 id="restartAppDialogTitle" class="mdl-dialog__title" data-i18n="Restart Moonlight">Restart Moonlight</h3>
+      <h3 id="restartAppDialogTitle" class="mdl-dialog__title" data-i18n="Restart VibeLight">Restart VibeLight</h3>
       <div class="mdl-dialog__content">
-        <p id="restartAppDialogText" data-i18n="Are you sure you want to restart Moonlight?">
-          Are you sure you want to restart Moonlight?
+        <p id="restartAppDialogText" data-i18n="Are you sure you want to restart VibeLight?">
+          Are you sure you want to restart VibeLight?
         </p>
       </div>
       <div class="mdl-dialog__actions">
@@ -949,10 +964,10 @@
   </div>
   <div id="exitAppDialogOverlay" class="dialog-overlay">
     <dialog id="exitAppDialog" class="mdl-dialog">
-      <h3 id="exitAppDialogTitle" class="mdl-dialog__title" data-i18n="Exit Moonlight">Exit Moonlight</h3>
+      <h3 id="exitAppDialogTitle" class="mdl-dialog__title" data-i18n="Exit VibeLight">Exit VibeLight</h3>
       <div class="mdl-dialog__content">
-        <p id="exitAppDialogText" data-i18n="Are you sure you want to exit Moonlight?">
-          Are you sure you want to exit Moonlight?
+        <p id="exitAppDialogText" data-i18n="Are you sure you want to exit VibeLight?">
+          Are you sure you want to exit VibeLight?
         </p>
       </div>
       <div class="mdl-dialog__actions">

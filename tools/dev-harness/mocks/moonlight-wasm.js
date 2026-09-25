@@ -13,6 +13,7 @@
 //   &loss=0            Random frame loss of the simulated network, in percent
 //   &renderLimit=0     Highest frame rate the simulated TV decoder renders, 0 for no limit
 //   &freeze=0          Simulate a video pipeline that stops after the first frame
+//   &running=20002     Id of an app that already runs on the host
 //
 // Nothing here is shipped with the widget.
 (function(global) {
@@ -42,7 +43,7 @@
     uniqueid: '4F8A2C1B-7D3E-4A56-9B21-C0FFEE123456',
     mac: '3C:7C:3F:12:34:56',
     paired: params.get('scenario') !== 'fresh',
-    currentGame: 0,
+    currentGame: numberParam('running', 0),
     apps: [
       { id: 881448767, title: 'Desktop' },
       { id: 1093255277, title: 'Steam Big Picture' },
