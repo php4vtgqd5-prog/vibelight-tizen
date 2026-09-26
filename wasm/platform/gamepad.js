@@ -33,8 +33,13 @@ const Controller = (function() {
         }
       }
 
+      // Each axis keeps its last reported value, so a stick moving slowly is still reported once its
+      // value has changed by more than the noise of a stick at rest
+      let axes = null;
       for (let i = 0; i < newAxes.length; i++) {
-        if (this.axes[i] !== newAxes[i]) {
+        if (GamepadCore.axisChanged(this.axes[i], newAxes[i])) {
+          axes = axes || this.axes.slice();
+          axes[i] = newAxes[i];
           changes.push({
             type: 'axis',
             index: i,
@@ -54,7 +59,9 @@ const Controller = (function() {
       );
 
       this.buttons = newButtons.map((button) => new Button(button));
-      this.axes = newAxes.slice(); // Update stored axis values
+      if (axes) {
+        this.axes = axes;
+      }
     }
   }
 

@@ -49,6 +49,9 @@ var codecWarning = false; // Flag indicating whether the video codec warning mes
 var repeatAction = null; // Flag indicating whether the repeat action is set, initial value is null
 var lastInvokeTime = 0; // Flag indicating the last invoke time, initial value is 0
 var repeatTimeout = null; // Flag indicating whether the repeat timeout is set, initial value is null
+var repeatFrame = null; // Animation frame of the running repeat, null when no repeat runs
+var repeatSource = null; // Button or axis whose repeat runs, such as button12 or axis0
+var axisDirections = {}; // Direction of each axis of the left stick: -1, 0 or 1
 var navigationTimeout = null; // Flag indicating whether the navigation timeout is set, initial value is null
 const APP_NAME = 'VibeLight'; // Name of the application shown on the home screen
 const BUILD_TYPE = '__BUILD_TYPE__'; // Placeholder for build type, which should be replaced during the build process
@@ -387,66 +390,47 @@ function attachListeners() {
   Controller.startWatching();
   window.addEventListener('gamepadinputchanged', (e) => {
     isGamepadActive = true;
-    const changes = e.detail.changes;
-    // Iterate through each change in the gamepad input
-    changes.forEach((change) => {
+    // SELECT and START mirror the CHANNEL UP and CHANNEL DOWN keys, as the navigation guide describes
+    const buttonMapping = {
+      0: () => delayedNavigation(() => Navigation.accept()),
+      1: () => delayedNavigation(() => Navigation.back()),
+      8: () => delayedNavigation(() => Navigation.press()),
+      9: () => delayedNavigation(() => Navigation.switch()),
+    };
+    const dPadMapping = {
+      12: () => Navigation.up(),
+      13: () => Navigation.down(),
+      14: () => Navigation.left(),
+      15: () => Navigation.right(),
+    };
+    // Left stick: the horizontal axis, then the vertical one, each with its two directions
+    const axisMapping = {
+      0: { '-1': () => Navigation.left(), '1': () => Navigation.right() },
+      1: { '-1': () => Navigation.up(), '1': () => Navigation.down() },
+    };
+    e.detail.changes.forEach((change) => {
       const { type, index, pressed, value } = change;
       if (type === 'button') {
-        // Handle button mapping
-        // SELECT and START mirror the CHANNEL UP and CHANNEL DOWN keys, as the navigation guide describes
-        const buttonMapping = {
-          0: () => delayedNavigation(() => Navigation.accept()),
-          1: () => delayedNavigation(() => Navigation.back()),
-          8: () => delayedNavigation(() => Navigation.press()),
-          9: () => delayedNavigation(() => Navigation.switch()),
-        };
-        // Handle D-Pad mapping
-        const dPadMapping = {
-          12: () => Navigation.up(),
-          13: () => Navigation.down(),
-          14: () => Navigation.left(),
-          15: () => Navigation.right(),
-        };
-        // Handle button press
-        if (pressed) {
-          if (buttonMapping[index]) {
-            buttonMapping[index]();
-            // Clear repeat action and timeout for non-navigation buttons
-            repeatAction = null;
-            clearTimeout(repeatTimeout);
-          } else if (dPadMapping[index]) {
-            dPadMapping[index]();
-            // Set repeat action and timeout to the mapped D-Pad button
-            repeatAction = dPadMapping[index];
-            lastInvokeTime = Date.now();
-            repeatTimeout = setTimeout(() => requestAnimationFrame(repeatActionHandler), REPEAT_DELAY);
-          }
-        } else {
-          // Clear repeat action and timeout if button is released
-          repeatAction = null;
-          clearTimeout(repeatTimeout);
+        if (!pressed) {
+          // Releasing a button stops only its own repeat, not the one of a direction still held
+          stopRepeat('button' + index);
+        } else if (buttonMapping[index]) {
+          buttonMapping[index]();
+          stopRepeat();
+        } else if (dPadMapping[index]) {
+          dPadMapping[index]();
+          startRepeat('button' + index, dPadMapping[index]);
         }
-      } else if (type === 'axis') {
-        // Handle axis mapping
-        const axisMapping = {
-          0: (value) => value < -ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.left()), () => Navigation.left()) : 
-            value > ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.right()), () => Navigation.right()) : null,
-          1: (value) => value < -ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.up()), () => Navigation.up()) : 
-            value > ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.down()), () => Navigation.down()) : null,
-        };
-        // Handle axis value
-        if (axisMapping[index]) {
-          const axisValue = axisMapping[index](value);
-          if (axisValue && Math.abs(value) > ACTION_THRESHOLD) {
-            // Set repeat action and timeout to the mapped axis
-            repeatAction = axisValue;
-            lastInvokeTime = Date.now();
-            repeatTimeout = setTimeout(() => requestAnimationFrame(repeatActionHandler), REPEAT_DELAY);
-          } else {
-            // Clear repeat action and timeout if axis is released
-            repeatAction = null;
-            clearTimeout(repeatTimeout);
-          }
+      } else if (type === 'axis' && axisMapping[index]) {
+        // Only a new direction of the stick moves the focus, as its value changes on almost every poll
+        const step = GamepadCore.axisStep(axisDirections[index], value, ACTION_THRESHOLD);
+        axisDirections[index] = step.direction;
+        if (step.action === 'move') {
+          const move = axisMapping[index][step.direction];
+          delayedNavigation(move);
+          startRepeat('axis' + index, move);
+        } else if (step.action === 'release') {
+          stopRepeat('axis' + index);
         }
       }
     });
@@ -486,11 +470,40 @@ function repeatActionHandler() {
   }
   // Check if repeat action is still set, then schedule the next execution frame
   if (repeatAction) {
-    requestAnimationFrame(repeatActionHandler);
+    repeatFrame = requestAnimationFrame(repeatActionHandler);
+  }
+}
+
+// Repeats a navigation while its button or stick direction is held, after the repeat delay. Only
+// one repeat runs at a time, so a new one replaces the previous one instead of adding a loop.
+function startRepeat(source, action) {
+  stopRepeat();
+  repeatAction = action;
+  repeatSource = source;
+  lastInvokeTime = Date.now();
+  repeatTimeout = setTimeout(() => {
+    repeatTimeout = null;
+    repeatFrame = requestAnimationFrame(repeatActionHandler);
+  }, REPEAT_DELAY);
+}
+
+// Stops the repeat, or only the repeat of the given button or axis when one is given
+function stopRepeat(source) {
+  if (source !== undefined && source !== repeatSource) {
+    return;
+  }
+  repeatAction = null;
+  repeatSource = null;
+  clearTimeout(repeatTimeout);
+  repeatTimeout = null;
+  if (repeatFrame !== null) {
+    cancelAnimationFrame(repeatFrame);
+    repeatFrame = null;
   }
 }
 
 // Delays navigation-related callback execution after a specified delay
+  repeatFrame = null;
 function delayedNavigation(callback) {
   // Clear any existing navigation timeout
   clearTimeout(navigationTimeout);
@@ -3100,6 +3113,9 @@ function fullscreenWasmModule() {
 }
 
 // Handle on-screen overlays when the streaming session starts
+  // A direction held when the stream starts must not keep repeating, nor be remembered after it
+  stopRepeat();
+  axisDirections = {};
 function handleOnScreenOverlays() {
   // Find the existing toggle switch elements
   const disableWarningsSwitch = document.getElementById('disableWarningsSwitch');
