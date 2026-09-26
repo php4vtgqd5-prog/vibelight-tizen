@@ -190,6 +190,7 @@ var Ambient = (function() {
   var timer = null;
   var visibleLayer = 0;
   var shownArt = '';
+  var focusedAppId = null;
 
   function layers() {
     return document.querySelectorAll('#ambientBackdrop .ambient-layer');
@@ -217,19 +218,31 @@ var Ambient = (function() {
     });
   }
 
+  function showApp(appId) {
+    var img = document.querySelector('#game-container-' + appId + ' img');
+    if (img && img.getAttribute('src')) {
+      show(img);
+    }
+  }
+
   return {
     focus: function(appId) {
+      focusedAppId = appId;
       clearTimeout(timer);
       timer = setTimeout(function() {
-        var img = document.querySelector('#game-container-' + appId + ' img');
-        if (img && img.getAttribute('src')) {
-          show(img);
-        }
+        showApp(appId);
       }, FOCUS_DELAY);
+    },
+    // The box art of an app is loaded after its card, possibly once the card has the focus
+    artLoaded: function(appId) {
+      if (appId === focusedAppId) {
+        showApp(appId);
+      }
     },
     clear: function() {
       clearTimeout(timer);
       shownArt = '';
+      focusedAppId = null;
       Array.prototype.forEach.call(layers(), function(layer) {
         layer.classList.remove('is-visible');
       });
@@ -462,6 +475,7 @@ function getBuildVersion(version) {
 
 // Handles repeated execution of the current action based on a specified interval
 function repeatActionHandler() {
+  repeatFrame = null;
   // Check if repeat action is set and enough time has passed since the last invocation
   if (repeatAction && Date.now() - lastInvokeTime > REPEAT_INTERVAL) {
     repeatAction();
@@ -503,7 +517,6 @@ function stopRepeat(source) {
 }
 
 // Delays navigation-related callback execution after a specified delay
-  repeatFrame = null;
 function delayedNavigation(callback) {
   // Clear any existing navigation timeout
   clearTimeout(navigationTimeout);
@@ -2948,7 +2961,10 @@ function showApps(host) {
             });
           });
 
-          boxArtPlaceholderImg.onload = e => boxArtPlaceholderImg.classList.add('fade-in');
+          boxArtPlaceholderImg.onload = e => {
+            boxArtPlaceholderImg.classList.add('fade-in');
+            Ambient.artLoaded(app.id);
+          };
           $(gameContainer).append(boxArtPlaceholderImg);
           boxArtPromises.push(boxArtPromise);
         });
@@ -3051,7 +3067,12 @@ function quitAppDialog() {
 }
 
 // Show the loading screen of a stream, over the box art of its app when it was loaded
+// Increased on every change of the loading screen, so a box art loaded late is not painted over the
+// loading screen of another stream, or after the loading screen was hidden
+var streamLoadingId = 0;
+
 function showStreamLoading(appId) {
+  var loadingId = ++streamLoadingId;
   var img = appId !== undefined && appId !== null ? document.querySelector('#game-container-' + appId + ' img') : null;
   var art = img ? img.getAttribute('src') : '';
   $('#streamLoadingBackdrop').removeClass('has-art');
@@ -3059,7 +3080,7 @@ function showStreamLoading(appId) {
     var url = 'url("' + art.replace(/"/g, '%22') + '")';
     $('#loadingSpinnerArt').css('backgroundImage', url).show();
     whenImageLoaded(img, function() {
-      if (paintBlurredArt(document.getElementById('streamLoadingBackdropArt'), img, 1.3)) {
+      if (loadingId === streamLoadingId && paintBlurredArt(document.getElementById('streamLoadingBackdropArt'), img, 1.3)) {
         $('#streamLoadingBackdrop').addClass('has-art');
       }
     });
@@ -3071,6 +3092,7 @@ function showStreamLoading(appId) {
 }
 
 function hideStreamLoading() {
+  streamLoadingId++;
   $('#loadingSpinner').css('display', 'none');
   $('#streamLoadingBackdrop').hide();
 }
@@ -3091,6 +3113,9 @@ function showStreamMode(appId) {
   Navigation.stop();
   // The WASM module reads the gamepads itself while streaming
   Controller.pause();
+  // A direction held when the stream starts must not keep repeating, nor be remembered after it
+  stopRepeat();
+  axisDirections = {};
 }
 
 // Maximize the size of the Wasm module by scaling and resizing appropriately
@@ -3113,9 +3138,6 @@ function fullscreenWasmModule() {
 }
 
 // Handle on-screen overlays when the streaming session starts
-  // A direction held when the stream starts must not keep repeating, nor be remembered after it
-  stopRepeat();
-  axisDirections = {};
 function handleOnScreenOverlays() {
   // Find the existing toggle switch elements
   const disableWarningsSwitch = document.getElementById('disableWarningsSwitch');
