@@ -72,11 +72,21 @@ test('the watchdog detects decoding errors reported by the player', () => {
 test('a playback position that stops after moving means the video froze', () => {
   let state = null;
   let frozen = false;
-  const positions = [0.5, 1.5, 2.5, 2.5, 2.5, 2.5];
+  const positions = [0.5, 1.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5];
   for (const pos of positions) {
     ({ state, frozen } = GameMode.watchdogStep(state, sample({ pos })));
   }
   assert.equal(frozen, true);
+});
+
+test('a player that reports its position every few seconds is not taken as frozen', () => {
+  let state = null;
+  let frozen = false;
+  const positions = [0, 0, 0, 3, 3, 3, 6, 6, 6, 9, 9, 9, 12];
+  for (const pos of positions) {
+    ({ state, frozen } = GameMode.watchdogStep(state, sample({ pos })));
+    assert.equal(frozen, false);
+  }
 });
 
 test('a position that never moves is not taken as a freeze, as some players never update it', () => {

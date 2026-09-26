@@ -22,6 +22,9 @@
   var REJECTED_SHARE = 0.8;
   // Decoding errors the player reports asynchronously in one sample for it to look frozen
   var DECODING_ERRORS = 3;
+  // Samples in a row without a new playback position before a sample looks frozen, which leaves
+  // room for players that report their position less often than every second
+  var STILL_POSITION_SAMPLES = 3;
   // A stopped stream in the Ultra Low latency mode shorter than this, in seconds, may have frozen
   var SUSPICIOUS_SESSION_SECONDS = 45;
 
@@ -97,7 +100,7 @@
 
     var rejected = (sample.fail || 0) / 100 >= REJECTED_SHARE;
     var decodingErrors = (sample.vErr || 0) >= DECODING_ERRORS;
-    var stalled = next.positionMoved && next.stillPositions > 0 && sample.ren > 0;
+    var stalled = next.positionMoved && next.stillPositions >= STILL_POSITION_SAMPLES && sample.ren > 0;
     next.frozenSamples = rejected || decodingErrors || stalled ? next.frozenSamples + 1 : 0;
     return { state: next, frozen: next.frozenSamples >= FROZEN_SAMPLES };
   }
