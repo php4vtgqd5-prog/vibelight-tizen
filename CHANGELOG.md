@@ -9,6 +9,7 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Filtered out the noise of the analog sticks at rest, so it no longer wakes the interface on every poll of the gamepads
 - Ran a single repeat of the held direction at a time, instead of a new loop on every change of a stick
 - Ran the checks and the UI tests before building the widgets of a release, and published tags such as v2.0.2-beta.1 as pre-releases
+- Measured the latency of Auto-Tune on a path the host answers at once, instead of /serverinfo, which Sunshine on Windows takes up to about a hundred milliseconds to gather and which made a healthy network look weak
 
 ### Fixed
 - Fixed a held D-pad direction stopping its repeat when an analog stick at rest reported a tiny change
@@ -16,6 +17,10 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Fixed the release of a button stopping the repeat of a direction still held
 - Fixed the blurred background of the Apps view missing when the box art of the focused app loaded after it got the focus
 - Fixed a box art loaded late being painted behind the loading screen of another stream
+- Fixed a PC that could no longer be opened after its pairing dialog was canceled, until VibeLight restarted
+- Fixed a PC that could no longer be opened when it was chosen while its status was being refreshed
+- Fixed a pairing the host refused, as after a wrong PIN, being reported as successful
+- Fixed the error messages failing when they were shown before the interface finished loading, which left the loading of the apps unfinished
 
 ## v2.0.1
 

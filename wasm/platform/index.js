@@ -29,6 +29,8 @@ try {
 var isHdrCapable = webapis.avinfo.isHdrTvSupport(); // Check if the device supports HDR
 var hosts = {}; // Hosts is an associative array of NvHTTP objects, keyed by server UID
 var isHostOpening = false; // Prevents concurrent hostChosen executions, initial value is false
+var hostOpeningSince = 0; // Time the host being opened was chosen, in milliseconds
+const HOST_OPENING_TIMEOUT_MS = 20000; // Longest a host stays opening before another choice is accepted
 var isHostsLoaded = false; // Indicates if IndexedDB has finished loading hosts
 var isSubnetScanFinished = false; // Indicates if the initial subnet scan has completed
 var deepLinkRequested = false; // Indicates if the app was launched to open a host or an app from Smart Hub
@@ -614,7 +616,14 @@ function beginBackgroundPollingOfHost(host) {
     // >= 2 consecutive failures inside pollServer), so resetting it here does not
     // interfere with future offline detection either.
     host._consecutivePollFailures = 0;
+    // The callers still waiting on a poll, such as the pairing dialog, get the state just refreshed.
+    // Dropping them left the pairing dialog of a host opened at that moment waiting forever, and
+    // hostChosen() then ignored the host.
+    var pendingCallbacks = host._pollCompletionCallbacks;
     host._pollCompletionCallbacks = [];
+    pendingCallbacks.forEach(function(completion) {
+      completion(host);
+    });
 
     var scheduleNextPoll = function(delay) {
       // Stop if the poll was canceled (ID removed from activePolls)
@@ -674,21 +683,38 @@ function stopPollingHosts() {
 function snackbarLog(...args) {
   const translatedMessage = t(...args);
   console.log('%c[index.js, snackbarLog]', 'color: green;', ...args);
-  var data = {
+  showSnackbar({
     message: translatedMessage,
     timeout: 2500
-  };
-  document.querySelector('#snackbar').MaterialSnackbar.showSnackbar(data);
+  });
 }
 
 function snackbarLogLong(...args) {
   const translatedMessage = t(...args);
   console.log('%c[index.js, snackbarLogLong]', 'color: green;', ...args);
-  var data = {
+  showSnackbar({
     message: translatedMessage,
     timeout: 5000
-  };
-  document.querySelector('#snackbar').MaterialSnackbar.showSnackbar(data);
+  });
+}
+
+// Shows a message in the snackbar. The snackbar is a component of Material Design Lite, which is set
+// up once the page has loaded: a message sent earlier upgrades it first. The messages report errors
+// in the middle of flows, such as the loading of the apps, which must go on even without it.
+function showSnackbar(data) {
+  var element = document.querySelector('#snackbar');
+  try {
+    if (element && !element.MaterialSnackbar && window.componentHandler) {
+      componentHandler.upgradeElement(element);
+    }
+    if (element && element.MaterialSnackbar) {
+      element.MaterialSnackbar.showSnackbar(data);
+      return;
+    }
+  } catch (error) {
+    console.error('%c[index.js, showSnackbar]', 'color: green;', 'Error: Failed to show the snackbar: ', error);
+  }
+  console.warn('%c[index.js, showSnackbar]', 'color: green;', 'Warning: The snackbar is not ready, message not shown: ' + data.message);
 }
 
 // Handle layout elements when displaying the Hosts view
@@ -811,13 +837,18 @@ function restoreUiAfterWasmLoad() {
 
 // Handles the selection of a host, manages the connection, pairing process, including error handling
 function hostChosen(host, onSuccessCallback) {
-  // Check if a host is already being opened to prevent concurrent executions
-  if (isHostOpening) {
+  // Check if a host is already being opened to prevent concurrent executions. The flag expires, so
+  // a flow that never ends cannot leave every host ignored until VibeLight restarts.
+  if (isHostOpening && Date.now() - hostOpeningSince < HOST_OPENING_TIMEOUT_MS) {
     return;
+  }
+  if (isHostOpening) {
+    console.warn('%c[index.js, hostChosen]', 'color: green;', 'Warning: The previous opening of a host never ended, opening ' + host.hostname + ' anyway.');
   }
 
   // Set the flag to indicate that a host is currently being opened
   isHostOpening = true;
+  hostOpeningSince = Date.now();
 
   // Check if a pairing request is already in progress to prevent multiple pairing attempts
   if (isPairingInProgress) {
@@ -1207,14 +1238,28 @@ function addHostDialog() {
 // Show the Pairing dialog before pairing with the given NvHTTP host object. Returns whether the pairing was successful or failed.
 function pairingDialog(nvhttpHost, onSuccess, onFailure) {
   if (typeof window.abortSubnetScan === 'function') window.abortSubnetScan();
-  if (!onFailure) {
-    onFailure = function() {}
-  }
+  // Exactly one of the callbacks runs, whichever way the pairing ends. The caller may hold a lock
+  // until then, such as hostChosen(), which ignored every host after a canceled pairing.
+  var settled = false;
+  var succeed = function() {
+    if (!settled) {
+      settled = true;
+      onSuccess();
+    }
+  };
+  var fail = function() {
+    if (!settled) {
+      settled = true;
+      if (onFailure) {
+        onFailure();
+      }
+    }
+  };
 
   if (!pairingCert) {
     console.warn('%c[index.js, pairingDialog]', 'color: green;', 'Warning: Pairing certificate is not generated yet. Please ensure Wasm is initialized properly!');
     snackbarLogLong('Something went wrong with the pairing certificate. Please try pairing with the host PC again.');
-    onFailure();
+    fail();
     return;
   }
 
@@ -1222,18 +1267,18 @@ function pairingDialog(nvhttpHost, onSuccess, onFailure) {
     if (!returnedNvHTTPHost.online) {
       console.error('%c[index.js, pairingDialog]', 'color: green;', 'Error: Failed to connect to ' + nvhttpHost.hostname + '. Ensure your host PC is online!', nvhttpHost, '\n' + nvhttpHost.toString()); // Logging both object (for console) and toString-ed object (for text logs)
       snackbarLogLong('Failed to connect to %1$s. Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.', nvhttpHost.hostname || t('the host'));
-      onFailure();
+      fail();
       return;
     }
 
     if (nvhttpHost.paired) {
-      onSuccess();
+      succeed();
       return;
     }
 
     if (nvhttpHost.currentGame != 0) {
       snackbarLogLong('%1$s is currently in a game session. Please quit the running app or restart the computer, then try again.', nvhttpHost.hostname);
-      onFailure();
+      fail();
       return;
     }
 
@@ -1272,11 +1317,25 @@ function pairingDialog(nvhttpHost, onSuccess, onFailure) {
       pairingDialog.close();
       isDialogOpen = false;
       Navigation.pop();
+      // Canceled, or closed after a failure: the host is not opened
+      fail();
     });
 
     console.log('%c[index.js, pairingDialog]', 'color: green;', 'Sending pairing request to ' + nvhttpHost.hostname + ' with PIN ' + randomNumber);
-    nvhttpHost.pair(randomNumber).then(function() {
+    nvhttpHost.pair(randomNumber).then(function(paired) {
+      // The host answers the last step of the pairing with whether it accepted it, as when the PIN
+      // was entered wrong, which ends like any other failed pairing
+      if (!paired) {
+        throw new Error('The host did not accept the pairing');
+      }
+    }).then(function() {
       isPairingInProgress = false;
+      if (wasPairingCanceled) {
+        // Paired as the dialog was closed: keep the pairing, but stay where the user went back to
+        console.log('%c[index.js, pairingDialog]', 'color: green;', 'Paired with ' + nvhttpHost.hostname + ' after the dialog was canceled.');
+        saveHosts();
+        return;
+      }
       snackbarLog('Successfully paired with %1$s', nvhttpHost.hostname);
       // Close the dialog if the pairing was successful
       console.log('%c[index.js, pairingDialog]', 'color: green;', 'Closing app dialog and returning.');
@@ -1284,7 +1343,7 @@ function pairingDialog(nvhttpHost, onSuccess, onFailure) {
       pairingDialog.close();
       isDialogOpen = false;
       Navigation.pop();
-      onSuccess();
+      succeed();
     }, function(failedPairing) {
       isPairingInProgress = false;
       if (wasPairingCanceled) {
@@ -1303,7 +1362,7 @@ function pairingDialog(nvhttpHost, onSuccess, onFailure) {
       } else {
         $('#pairingDialogText').html(t('Error: Failed to pair with %1$s.<br><br>Please, try pairing with the host again.', escapeHtml(nvhttpHost.hostname)));
       }
-      onFailure();
+      fail();
     });
   });
 }
