@@ -33,3 +33,8 @@ test('releaseNotes lists the entries under the heading the update dialog reads',
 test('releaseNotes fails for a version without entries', () => {
   assert.throws(() => releaseNotes(CHANGELOG, '9.9.9'), /no section/);
 });
+
+test('releaseNotes links the changelog of the tag of a pre-release', () => {
+  assert.match(releaseNotes(CHANGELOG, '2.0.0'), /blob\/v2\.0\.0\/CHANGELOG\.md/);
+  assert.match(releaseNotes(CHANGELOG, '2.0.0', 'v2.0.0-beta.1'), /blob\/v2\.0\.0-beta\.1\/CHANGELOG\.md/);
+});

@@ -1,5 +1,7 @@
 # Builds the widgets of a version and publishes them as a GitHub release. Push a tag named after the
-# version of res/config.xml (for example v2.0.0) after adding its section to CHANGELOG.md.
+# version of res/config.xml (for example v2.0.0) after adding its section to CHANGELOG.md. A tag with
+# a suffix (for example v2.0.0-beta.1) publishes a pre-release of that version, which the update
+# check of the app ignores, as it only asks GitHub for the latest release.
 name: Release
 on:
   push:
@@ -18,20 +20,55 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-tags: true
       - name: Read the version
+        env:
+          DISPATCH_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
         run: |
           VERSION=$(grep -oP 'version="\K[0-9]+\.[0-9]+\.[0-9]+' res/config.xml)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
-            echo "The tag ${GITHUB_REF_NAME} does not match the version ${VERSION} of res/config.xml" >&2
-            exit 1
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            case "${GITHUB_REF_NAME}" in
+              "v${VERSION}") PRERELEASE=false ;;
+              "v${VERSION}"-*) PRERELEASE=true ;;
+              *)
+                echo "The tag ${GITHUB_REF_NAME} does not match the version ${VERSION} of res/config.xml" >&2
+                exit 1
+                ;;
+            esac
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v${VERSION}"
+            PRERELEASE="${DISPATCH_PRERELEASE}"
+            # A run started by hand must not replace the widgets of a version already released
+            if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then
+              echo "The tag ${TAG} already exists: raise the version in res/config.xml, or push a tag such as ${TAG}-beta.1" >&2
+              exit 1
+            fi
           fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: npm
+      # A release is built only from sources that pass the same checks as the CI workflow
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Locale files are in sync with the sources
+        run: npm run i18n:check
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: UI tests
+        run: npm run test:ui
       - name: Write the release notes from CHANGELOG.md
-        run: node tools/ci/release-notes.mjs "$VERSION" > release-notes.md
+        run: node tools/ci/release-notes.mjs "$VERSION" "$TAG" > release-notes.md
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build the standard widget
@@ -62,10 +99,12 @@ jobs:
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ env.VERSION }}
-          name: VibeLight v${{ env.VERSION }}
+          tag_name: ${{ env.TAG }}
+          # A tag created by the release points to the commit that was built
+          target_commitish: ${{ github.sha }}
+          name: VibeLight ${{ env.TAG }}
           body_path: release-notes.md
-          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
+          prerelease: ${{ env.PRERELEASE == 'true' }}
           files: |
             VibeLight.wgt
             VibeLight-GameMode.wgt

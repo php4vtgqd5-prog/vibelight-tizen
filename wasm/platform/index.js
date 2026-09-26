@@ -49,6 +49,9 @@ var codecWarning = false; // Flag indicating whether the video codec warning mes
 var repeatAction = null; // Flag indicating whether the repeat action is set, initial value is null
 var lastInvokeTime = 0; // Flag indicating the last invoke time, initial value is 0
 var repeatTimeout = null; // Flag indicating whether the repeat timeout is set, initial value is null
+var repeatFrame = null; // Animation frame of the running repeat, null when no repeat runs
+var repeatSource = null; // Button or axis whose repeat runs, such as button12 or axis0
+var axisDirections = {}; // Direction of each axis of the left stick: -1, 0 or 1
 var navigationTimeout = null; // Flag indicating whether the navigation timeout is set, initial value is null
 const APP_NAME = 'VibeLight'; // Name of the application shown on the home screen
 const BUILD_TYPE = '__BUILD_TYPE__'; // Placeholder for build type, which should be replaced during the build process
@@ -187,6 +190,7 @@ var Ambient = (function() {
   var timer = null;
   var visibleLayer = 0;
   var shownArt = '';
+  var focusedAppId = null;
 
   function layers() {
     return document.querySelectorAll('#ambientBackdrop .ambient-layer');
@@ -214,19 +218,31 @@ var Ambient = (function() {
     });
   }
 
+  function showApp(appId) {
+    var img = document.querySelector('#game-container-' + appId + ' img');
+    if (img && img.getAttribute('src')) {
+      show(img);
+    }
+  }
+
   return {
     focus: function(appId) {
+      focusedAppId = appId;
       clearTimeout(timer);
       timer = setTimeout(function() {
-        var img = document.querySelector('#game-container-' + appId + ' img');
-        if (img && img.getAttribute('src')) {
-          show(img);
-        }
+        showApp(appId);
       }, FOCUS_DELAY);
+    },
+    // The box art of an app is loaded after its card, possibly once the card has the focus
+    artLoaded: function(appId) {
+      if (appId === focusedAppId) {
+        showApp(appId);
+      }
     },
     clear: function() {
       clearTimeout(timer);
       shownArt = '';
+      focusedAppId = null;
       Array.prototype.forEach.call(layers(), function(layer) {
         layer.classList.remove('is-visible');
       });
@@ -387,66 +403,47 @@ function attachListeners() {
   Controller.startWatching();
   window.addEventListener('gamepadinputchanged', (e) => {
     isGamepadActive = true;
-    const changes = e.detail.changes;
-    // Iterate through each change in the gamepad input
-    changes.forEach((change) => {
+    // SELECT and START mirror the CHANNEL UP and CHANNEL DOWN keys, as the navigation guide describes
+    const buttonMapping = {
+      0: () => delayedNavigation(() => Navigation.accept()),
+      1: () => delayedNavigation(() => Navigation.back()),
+      8: () => delayedNavigation(() => Navigation.press()),
+      9: () => delayedNavigation(() => Navigation.switch()),
+    };
+    const dPadMapping = {
+      12: () => Navigation.up(),
+      13: () => Navigation.down(),
+      14: () => Navigation.left(),
+      15: () => Navigation.right(),
+    };
+    // Left stick: the horizontal axis, then the vertical one, each with its two directions
+    const axisMapping = {
+      0: { '-1': () => Navigation.left(), '1': () => Navigation.right() },
+      1: { '-1': () => Navigation.up(), '1': () => Navigation.down() },
+    };
+    e.detail.changes.forEach((change) => {
       const { type, index, pressed, value } = change;
       if (type === 'button') {
-        // Handle button mapping
-        // SELECT and START mirror the CHANNEL UP and CHANNEL DOWN keys, as the navigation guide describes
-        const buttonMapping = {
-          0: () => delayedNavigation(() => Navigation.accept()),
-          1: () => delayedNavigation(() => Navigation.back()),
-          8: () => delayedNavigation(() => Navigation.press()),
-          9: () => delayedNavigation(() => Navigation.switch()),
-        };
-        // Handle D-Pad mapping
-        const dPadMapping = {
-          12: () => Navigation.up(),
-          13: () => Navigation.down(),
-          14: () => Navigation.left(),
-          15: () => Navigation.right(),
-        };
-        // Handle button press
-        if (pressed) {
-          if (buttonMapping[index]) {
-            buttonMapping[index]();
-            // Clear repeat action and timeout for non-navigation buttons
-            repeatAction = null;
-            clearTimeout(repeatTimeout);
-          } else if (dPadMapping[index]) {
-            dPadMapping[index]();
-            // Set repeat action and timeout to the mapped D-Pad button
-            repeatAction = dPadMapping[index];
-            lastInvokeTime = Date.now();
-            repeatTimeout = setTimeout(() => requestAnimationFrame(repeatActionHandler), REPEAT_DELAY);
-          }
-        } else {
-          // Clear repeat action and timeout if button is released
-          repeatAction = null;
-          clearTimeout(repeatTimeout);
+        if (!pressed) {
+          // Releasing a button stops only its own repeat, not the one of a direction still held
+          stopRepeat('button' + index);
+        } else if (buttonMapping[index]) {
+          buttonMapping[index]();
+          stopRepeat();
+        } else if (dPadMapping[index]) {
+          dPadMapping[index]();
+          startRepeat('button' + index, dPadMapping[index]);
         }
-      } else if (type === 'axis') {
-        // Handle axis mapping
-        const axisMapping = {
-          0: (value) => value < -ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.left()), () => Navigation.left()) : 
-            value > ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.right()), () => Navigation.right()) : null,
-          1: (value) => value < -ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.up()), () => Navigation.up()) : 
-            value > ACTION_THRESHOLD ? (delayedNavigation(() => Navigation.down()), () => Navigation.down()) : null,
-        };
-        // Handle axis value
-        if (axisMapping[index]) {
-          const axisValue = axisMapping[index](value);
-          if (axisValue && Math.abs(value) > ACTION_THRESHOLD) {
-            // Set repeat action and timeout to the mapped axis
-            repeatAction = axisValue;
-            lastInvokeTime = Date.now();
-            repeatTimeout = setTimeout(() => requestAnimationFrame(repeatActionHandler), REPEAT_DELAY);
-          } else {
-            // Clear repeat action and timeout if axis is released
-            repeatAction = null;
-            clearTimeout(repeatTimeout);
-          }
+      } else if (type === 'axis' && axisMapping[index]) {
+        // Only a new direction of the stick moves the focus, as its value changes on almost every poll
+        const step = GamepadCore.axisStep(axisDirections[index], value, ACTION_THRESHOLD);
+        axisDirections[index] = step.direction;
+        if (step.action === 'move') {
+          const move = axisMapping[index][step.direction];
+          delayedNavigation(move);
+          startRepeat('axis' + index, move);
+        } else if (step.action === 'release') {
+          stopRepeat('axis' + index);
         }
       }
     });
@@ -478,6 +475,7 @@ function getBuildVersion(version) {
 
 // Handles repeated execution of the current action based on a specified interval
 function repeatActionHandler() {
+  repeatFrame = null;
   // Check if repeat action is set and enough time has passed since the last invocation
   if (repeatAction && Date.now() - lastInvokeTime > REPEAT_INTERVAL) {
     repeatAction();
@@ -486,7 +484,35 @@ function repeatActionHandler() {
   }
   // Check if repeat action is still set, then schedule the next execution frame
   if (repeatAction) {
-    requestAnimationFrame(repeatActionHandler);
+    repeatFrame = requestAnimationFrame(repeatActionHandler);
+  }
+}
+
+// Repeats a navigation while its button or stick direction is held, after the repeat delay. Only
+// one repeat runs at a time, so a new one replaces the previous one instead of adding a loop.
+function startRepeat(source, action) {
+  stopRepeat();
+  repeatAction = action;
+  repeatSource = source;
+  lastInvokeTime = Date.now();
+  repeatTimeout = setTimeout(() => {
+    repeatTimeout = null;
+    repeatFrame = requestAnimationFrame(repeatActionHandler);
+  }, REPEAT_DELAY);
+}
+
+// Stops the repeat, or only the repeat of the given button or axis when one is given
+function stopRepeat(source) {
+  if (source !== undefined && source !== repeatSource) {
+    return;
+  }
+  repeatAction = null;
+  repeatSource = null;
+  clearTimeout(repeatTimeout);
+  repeatTimeout = null;
+  if (repeatFrame !== null) {
+    cancelAnimationFrame(repeatFrame);
+    repeatFrame = null;
   }
 }
 
@@ -2935,7 +2961,10 @@ function showApps(host) {
             });
           });
 
-          boxArtPlaceholderImg.onload = e => boxArtPlaceholderImg.classList.add('fade-in');
+          boxArtPlaceholderImg.onload = e => {
+            boxArtPlaceholderImg.classList.add('fade-in');
+            Ambient.artLoaded(app.id);
+          };
           $(gameContainer).append(boxArtPlaceholderImg);
           boxArtPromises.push(boxArtPromise);
         });
@@ -3038,7 +3067,12 @@ function quitAppDialog() {
 }
 
 // Show the loading screen of a stream, over the box art of its app when it was loaded
+// Increased on every change of the loading screen, so a box art loaded late is not painted over the
+// loading screen of another stream, or after the loading screen was hidden
+var streamLoadingId = 0;
+
 function showStreamLoading(appId) {
+  var loadingId = ++streamLoadingId;
   var img = appId !== undefined && appId !== null ? document.querySelector('#game-container-' + appId + ' img') : null;
   var art = img ? img.getAttribute('src') : '';
   $('#streamLoadingBackdrop').removeClass('has-art');
@@ -3046,7 +3080,7 @@ function showStreamLoading(appId) {
     var url = 'url("' + art.replace(/"/g, '%22') + '")';
     $('#loadingSpinnerArt').css('backgroundImage', url).show();
     whenImageLoaded(img, function() {
-      if (paintBlurredArt(document.getElementById('streamLoadingBackdropArt'), img, 1.3)) {
+      if (loadingId === streamLoadingId && paintBlurredArt(document.getElementById('streamLoadingBackdropArt'), img, 1.3)) {
         $('#streamLoadingBackdrop').addClass('has-art');
       }
     });
@@ -3058,6 +3092,7 @@ function showStreamLoading(appId) {
 }
 
 function hideStreamLoading() {
+  streamLoadingId++;
   $('#loadingSpinner').css('display', 'none');
   $('#streamLoadingBackdrop').hide();
 }
@@ -3078,6 +3113,9 @@ function showStreamMode(appId) {
   Navigation.stop();
   // The WASM module reads the gamepads itself while streaming
   Controller.pause();
+  // A direction held when the stream starts must not keep repeating, nor be remembered after it
+  stopRepeat();
+  axisDirections = {};
 }
 
 // Maximize the size of the Wasm module by scaling and resizing appropriately

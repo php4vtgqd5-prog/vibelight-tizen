@@ -59,7 +59,7 @@ export default [
   },
   {
     // Decision logic shared by the widget and the unit tests, which has no other dependencies
-    files: ['wasm/platform/stats-core.js', 'wasm/platform/autotune-core.js', 'wasm/platform/gamemode-core.js'],
+    files: ['wasm/platform/stats-core.js', 'wasm/platform/autotune-core.js', 'wasm/platform/gamemode-core.js', 'wasm/platform/gamepad-core.js'],
     languageOptions: {
       globals: { ...globals.browser, module: 'readonly' },
     },

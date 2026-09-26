@@ -142,7 +142,9 @@ Moduł WebAssembly i aplikację buduje się narzędziami Tizen SDK i Samsung Ems
 GitHub Actions uruchamia sprawdzenia, testy interfejsu i build aplikacji przy każdym pushu
 ([ci.yml](.github/workflows/ci.yml)). Aby wydać wersję, zmień numer wersji w `res/config.xml`
 i `package.json`, dodaj jej sekcję do [CHANGELOG.md](CHANGELOG.md) i wypchnij tag, np. `v2.0.0`:
-[release.yml](.github/workflows/release.yml) zbuduje oba warianty i opublikuje wydanie z opisem zmian.
+[release.yml](.github/workflows/release.yml) ponownie uruchomi sprawdzenia, zbuduje oba warianty
+i opublikuje wydanie z opisem zmian. Tag z przyrostkiem, np. `v2.0.0-beta.1`, publikuje wersję
+testową (pre-release), której aplikacja nie proponuje przy sprawdzaniu aktualizacji.
 
 Tłumaczenia są w `wasm/static/locales`; `npm run i18n:sync` dodaje nowe teksty do wszystkich języków,
 zobacz [CONTRIBUTING](.github/CONTRIBUTING.md).
