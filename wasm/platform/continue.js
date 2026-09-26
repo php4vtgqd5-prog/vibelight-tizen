@@ -100,8 +100,8 @@ var ContinuePlaying = (function() {
       return;
     }
     var lastHost = host();
-    $('#continueTitle').text(lastPlayed.appName || t('Stream'));
-    $('#continueSubtitle').text((lastHost.hostname || lastPlayed.hostName) + ' · ' + timeAgo(lastPlayed.at));
+    setTextIfChanged('#continueTitle', lastPlayed.appName || t('Stream'));
+    setTextIfChanged('#continueSubtitle', (lastHost.hostname || lastPlayed.hostName) + ' · ' + timeAgo(lastPlayed.at));
     banner.attr('data-host-status', hostStatus(lastHost) === 'offline' ? 'offline' : 'online');
     if (!banner.is(':visible')) {
       banner.show();

@@ -628,7 +628,7 @@ body.vl-streaming {
     cursor: pointer;
     text-align: center;
     will-change: transform;
-    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+    transition: transform 0.18s ease-out;
 }
 #host-grid .mdl-shadow--4dp {
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
@@ -793,7 +793,7 @@ body.vl-streaming {
     cursor: pointer;
     text-align: center;
     will-change: transform;
-    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+    transition: transform 0.18s ease-out;
 }
 #game-grid .mdl-card img {
     width: 100%;
@@ -1275,7 +1275,7 @@ button.setting-control {
     border: 1px solid transparent;
     border-radius: 18px;
     cursor: pointer;
-    transition: background-color 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    transition: background-color 0.15s ease-out, transform 0.15s ease-out;
 }
 .settings-category.hovered, .settings-category:hover, .settings-category:focus {
     color: var(--vl-text);
@@ -1784,19 +1784,15 @@ button.setting-control {
     overflow: hidden;
     background: radial-gradient(ellipse at 50% 38%, rgba(99, 102, 241, 0.24) 0%, rgba(99, 102, 241, 0) 62%), var(--vl-bg);
 }
-/* A small blurred copy of the box art scaled to the screen, far cheaper for the TV than blurring the full screen */
+/* A small canvas with a blurred copy of the box art (see paintBlurredArt), stretched to the screen.
+   A CSS blur of the screen costs the GPU of the TV on every frame. */
 #streamLoadingBackdropArt {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 25%;
-    height: 25%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     opacity: 0;
-    background-position: center;
-    background-size: cover;
-    -webkit-filter: blur(12px) saturate(1.3);
-    filter: blur(12px) saturate(1.3);
-    transform: translate(-50%, -50%) scale(5);
     transition: opacity 0.4s ease-out;
 }
 #streamLoadingBackdrop.has-art #streamLoadingBackdropArt {
@@ -1838,7 +1834,7 @@ button.setting-control {
     cursor: pointer;
     overflow: hidden;
     will-change: transform;
-    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+    transition: transform 0.18s ease-out;
 }
 #continue-banner.hovered, #continue-banner:hover, #continue-banner:focus {
     border-color: transparent;
@@ -1994,7 +1990,7 @@ button.setting-control {
     display: none;
 }
 /* =============================
-   Motion: cards rise into place, the focused card catches the light
+   Motion: cards rise into place
 ============================= */
 @keyframes vl-rise {
     from {
@@ -2004,14 +2000,6 @@ button.setting-control {
     to {
         opacity: 1;
         transform: none;
-    }
-}
-@keyframes vl-shine {
-    from {
-        transform: translateX(-120%) skewX(-18deg);
-    }
-    to {
-        transform: translateX(320%) skewX(-18deg);
     }
 }
 /* Only the start of the animation is kept, so the focused card can still scale afterwards */
@@ -2024,23 +2012,6 @@ button.setting-control {
 #host-grid .mdl-card:nth-child(5), #game-grid .mdl-card:nth-child(5) { animation-delay: 0.16s; }
 #host-grid .mdl-card:nth-child(6), #game-grid .mdl-card:nth-child(6) { animation-delay: 0.2s; }
 #host-grid .mdl-card:nth-child(n+7), #game-grid .mdl-card:nth-child(n+7) { animation-delay: 0.24s; }
-#host-grid .mdl-card::after, #game-grid .mdl-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 6;
-    width: 45%;
-    height: 100%;
-    background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0) 100%);
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(-120%) skewX(-18deg);
-}
-#host-grid .mdl-card.hovered::after, #game-grid .mdl-card.hovered::after {
-    opacity: 1;
-    animation: vl-shine 0.9s ease-out 0.1s both;
-}
 /* =============================
    Switches: larger toggles, easier to read from the couch
 ============================= */
@@ -2129,19 +2100,15 @@ button.setting-control {
 body.vl-view-apps #ambientBackdrop {
     display: block;
 }
-/* A small blurred copy of the box art scaled to the screen, cheaper than blurring the screen */
+/* A small canvas with a blurred copy of the box art (see paintBlurredArt), stretched to the screen.
+   A CSS blur of the screen costs the GPU of the TV on every frame and made the menus stutter. */
 .ambient-layer {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 25%;
-    height: 25%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     opacity: 0;
-    background-position: center;
-    background-size: cover;
-    -webkit-filter: blur(12px) saturate(1.4);
-    filter: blur(12px) saturate(1.4);
-    transform: translate(-50%, -50%) scale(5);
     transition: opacity 0.6s ease-out;
     will-change: opacity;
 }
