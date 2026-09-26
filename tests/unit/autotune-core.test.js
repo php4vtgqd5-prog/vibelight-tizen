@@ -228,3 +228,19 @@ test('an adaptive reconnect remembers the bitrate that struggled', () => {
   const next = AutoTune.recommend(input({ network: { type: 'wifi', wifiSignal: 0.9 }, profile: profile }));
   assert.ok(next.bitrate <= 36000, 'bitrate ' + next.bitrate);
 });
+
+test('wifiSignal reads the strength of Tizen, or the level of the Samsung API when it is NaN', () => {
+  assert.equal(AutoTune.wifiSignal(0.72, 4), 0.72);
+  assert.equal(AutoTune.wifiSignal(NaN, 4), 0.8);
+  assert.equal(AutoTune.wifiSignal(undefined, 5), 1);
+  assert.equal(AutoTune.wifiSignal(null, 1), 0.2);
+  assert.equal(AutoTune.wifiSignal(85, null), 0.85);
+  assert.equal(AutoTune.wifiSignal(NaN, NaN), null);
+  assert.equal(AutoTune.wifiSignal(NaN, 0), null);
+  assert.equal(AutoTune.wifiSignal(-1, undefined), null);
+});
+
+test('a Wi-Fi signal of NaN counts as an average signal, not as the weakest', () => {
+  assert.equal(AutoTune.classifyNetwork({ type: 'wifi', wifiSignal: NaN }), AutoTune.classifyNetwork({ type: 'wifi', wifiSignal: null }));
+  assert.notEqual(AutoTune.classifyNetwork({ type: 'wifi', wifiSignal: NaN }), 'weak');
+});

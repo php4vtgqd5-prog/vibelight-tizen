@@ -10,6 +10,8 @@
 //   &hdr=1           Whether the TV reports HDR support (default 1)
 //   &network=wifi    Active connection: ethernet or wifi (default wifi)
 //   &signal=0.8      Wi-Fi signal strength between 0 and 1 (default 0.8)
+//   &tizenSignal=1   0 makes the Tizen system info report NaN for the signal strength, as some TVs do,
+//                    which leaves only the level of the Samsung network API
 //
 // Nothing here is shipped with the widget.
 (function(global) {
@@ -21,6 +23,7 @@
   var hdr = params.get('hdr') !== '0';
   var network = params.get('network') || 'wifi';
   var signal = parseFloat(params.get('signal') || '0.8');
+  var tizenSignal = params.get('tizenSignal') !== '0';
 
   function asyncCall(callback, value) {
     if (typeof callback === 'function') {
@@ -89,7 +92,7 @@
               status: network === 'wifi' ? 'ON' : 'OFF',
               ssid: 'HomeNetwork',
               ipAddress: '192.168.1.20',
-              signalStrength: network === 'wifi' ? signal : 0,
+              signalStrength: network !== 'wifi' ? 0 : (tizenSignal ? signal : NaN),
             });
             break;
           case 'ETHERNET_NETWORK':

@@ -97,18 +97,25 @@ var AutoTune = (function() {
         return;
       }
       var settled = false;
+      var tizenStrength = null;
       var finish = function() {
-        if (!settled) {
-          settled = true;
-          resolve(info);
+        if (settled) {
+          return;
         }
+        settled = true;
+        var samsungLevel = null;
+        try {
+          samsungLevel = webapis.network.getWiFiSignalStrengthLevel();
+        } catch (error) {
+          samsungLevel = null;
+        }
+        info.wifiSignal = AutoTuneCore.wifiSignal(tizenStrength, samsungLevel);
+        resolve(info);
       };
       setTimeout(finish, 500);
       try {
         tizen.systeminfo.getPropertyValue('WIFI_NETWORK', function(wifi) {
-          if (wifi && typeof wifi.signalStrength === 'number') {
-            info.wifiSignal = wifi.signalStrength;
-          }
+          tizenStrength = wifi ? wifi.signalStrength : null;
           finish();
         }, finish);
       } catch (error) {
