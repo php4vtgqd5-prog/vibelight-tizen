@@ -99,6 +99,15 @@ function setViewClass(view) {
   }
 }
 
+// Changes the text of an element only when it differs, as the home screen is refreshed after every
+// poll of the hosts and rewriting the same text still makes the TV lay out and paint it again
+function setTextIfChanged(selector, text) {
+  var element = $(selector);
+  if (element.text() !== text) {
+    element.text(text);
+  }
+}
+
 // Greeting of the home screen, with the number of hosts that are online
 function renderHomeHero() {
   var hero = $('#home-hero');
@@ -108,11 +117,11 @@ function renderHomeHero() {
   }
   var hour = new Date().getHours();
   if (hour >= 4 && hour < 12) {
-    $('#homeGreeting').text(t('Good morning'));
+    setTextIfChanged('#homeGreeting', t('Good morning'));
   } else if (hour >= 12 && hour < 18) {
-    $('#homeGreeting').text(t('Good afternoon'));
+    setTextIfChanged('#homeGreeting', t('Good afternoon'));
   } else {
-    $('#homeGreeting').text(t('Good evening'));
+    setTextIfChanged('#homeGreeting', t('Good evening'));
   }
 
   var statuses = typeof hosts === 'object' && hosts ? Object.keys(hosts).map(function(uid) {
@@ -130,9 +139,45 @@ function renderHomeHero() {
   } else {
     subtitle = t('PCs online: %1$s of %2$s', online, statuses.length);
   }
-  $('#homeSubtitleText').text(subtitle);
+  setTextIfChanged('#homeSubtitleText', subtitle);
   $('#homeSubtitle').toggleClass('is-offline', online === 0 && !looking);
-  hero.show();
+  if (!hero.is(':visible')) {
+    hero.show();
+  }
+}
+
+// Paints a blurred copy of a box art into a small canvas, which the styles stretch to the screen.
+// A CSS blur of a layer that large costs the GPU of the TV on every frame and made the menus
+// stutter, while the stretched canvas is drawn like any other image.
+function paintBlurredArt(canvas, img, saturation) {
+  var ctx = canvas.getContext('2d');
+  var width = canvas.width;
+  var height = canvas.height;
+  if (!ctx || !img.naturalWidth || !img.naturalHeight) {
+    return false;
+  }
+  // Cover the canvas like background-size: cover, with a margin so the blur keeps the edges opaque
+  var margin = 6;
+  var scale = Math.max((width + 2 * margin) / img.naturalWidth, (height + 2 * margin) / img.naturalHeight);
+  var drawWidth = img.naturalWidth * scale;
+  var drawHeight = img.naturalHeight * scale;
+  ctx.clearRect(0, 0, width, height);
+  // Three canvas pixels are about the 60 pixels of blur the screen showed before
+  ctx.filter = 'blur(3px) saturate(' + saturation + ')';
+  ctx.drawImage(img, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+  ctx.filter = 'none';
+  return true;
+}
+
+// Calls back with the image once it is loaded, or never when it cannot be loaded
+function whenImageLoaded(img, callback) {
+  if (img.complete && img.naturalWidth) {
+    callback(img);
+    return;
+  }
+  img.addEventListener('load', function() {
+    callback(img);
+  }, { once: true });
 }
 
 // Background of the Apps view: a blurred copy of the box art of the focused app, cross-faded
@@ -147,17 +192,26 @@ var Ambient = (function() {
     return document.querySelectorAll('#ambientBackdrop .ambient-layer');
   }
 
-  function show(art) {
+  function show(img) {
+    var art = img.getAttribute('src');
     var all = layers();
     if (all.length < 2 || art === shownArt) {
       return;
     }
     shownArt = art;
-    var next = 1 - visibleLayer;
-    all[next].style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
-    all[next].classList.add('is-visible');
-    all[visibleLayer].classList.remove('is-visible');
-    visibleLayer = next;
+    whenImageLoaded(img, function() {
+      // The focus may have moved on while the box art was loading
+      if (shownArt !== art) {
+        return;
+      }
+      var next = 1 - visibleLayer;
+      if (!paintBlurredArt(all[next], img, 1.4)) {
+        return;
+      }
+      all[next].classList.add('is-visible');
+      all[visibleLayer].classList.remove('is-visible');
+      visibleLayer = next;
+    });
   }
 
   return {
@@ -165,9 +219,8 @@ var Ambient = (function() {
       clearTimeout(timer);
       timer = setTimeout(function() {
         var img = document.querySelector('#game-container-' + appId + ' img');
-        var art = img ? img.getAttribute('src') : '';
-        if (art) {
-          show(art);
+        if (img && img.getAttribute('src')) {
+          show(img);
         }
       }, FOCUS_DELAY);
     },
@@ -200,7 +253,7 @@ var headerStatusTimer = null;
 function updateHeaderStatus() {
   var now = new Date();
   var clock = now.toLocaleTimeString(window.i18n && window.i18n.getLocale ? window.i18n.getLocale() : undefined, { hour: '2-digit', minute: '2-digit' });
-  $('#header-clock').text(clock);
+  setTextIfChanged('#header-clock', clock);
 
   var icon = 'lan';
   var offline = false;
@@ -212,7 +265,8 @@ function updateHeaderStatus() {
   } catch (error) {
     icon = 'lan';
   }
-  $('#header-network-icon').text(icon).toggleClass('is-offline', offline);
+  setTextIfChanged('#header-network-icon', icon);
+  $('#header-network-icon').toggleClass('is-offline', offline);
   // Refresh the greeting and how long ago the last app was played
   renderHomeHero();
   ContinuePlaying.render();
@@ -469,8 +523,11 @@ function updateHostStatusIndicator(host) {
 
   // The card shows the status as a colored pill
   var status = hostStatus(host);
-  hostContainer.setAttribute('data-status', status);
-  if (label) {
+  // Unchanged after most polls, when writing it again would only restyle the card
+  if (hostContainer.getAttribute('data-status') !== status) {
+    hostContainer.setAttribute('data-status', status);
+  }
+  if (label && label.textContent !== hostStatusLabel(status)) {
     label.textContent = hostStatusLabel(status);
   }
   // The home screen shows whether the hosts are online
@@ -2984,15 +3041,17 @@ function quitAppDialog() {
 function showStreamLoading(appId) {
   var img = appId !== undefined && appId !== null ? document.querySelector('#game-container-' + appId + ' img') : null;
   var art = img ? img.getAttribute('src') : '';
+  $('#streamLoadingBackdrop').removeClass('has-art');
   if (art) {
     var url = 'url("' + art.replace(/"/g, '%22') + '")';
     $('#loadingSpinnerArt').css('backgroundImage', url).show();
-    $('#streamLoadingBackdropArt').css('backgroundImage', url);
-    $('#streamLoadingBackdrop').addClass('has-art');
+    whenImageLoaded(img, function() {
+      if (paintBlurredArt(document.getElementById('streamLoadingBackdropArt'), img, 1.3)) {
+        $('#streamLoadingBackdrop').addClass('has-art');
+      }
+    });
   } else {
     $('#loadingSpinnerArt').hide().css('backgroundImage', '');
-    $('#streamLoadingBackdropArt').css('backgroundImage', '');
-    $('#streamLoadingBackdrop').removeClass('has-art');
   }
   $('#streamLoadingBackdrop').show();
   $('#loadingSpinner').css('display', 'inline-block');

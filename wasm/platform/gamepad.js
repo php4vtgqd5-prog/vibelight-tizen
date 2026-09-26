@@ -43,12 +43,15 @@ const Controller = (function() {
         }
       }
 
-      if (changes.length > 0) {
-        window.dispatchEvent(new CustomEvent('gamepadinputchanged', {
-            detail: { changes },
-          })
-        );
+      // Without changes the stored state is already the current one
+      if (changes.length === 0) {
+        return;
       }
+
+      window.dispatchEvent(new CustomEvent('gamepadinputchanged', {
+          detail: { changes },
+        })
+      );
 
       this.buttons = newButtons.map((button) => new Button(button));
       this.axes = newAxes.slice(); // Update stored axis values
@@ -57,10 +60,12 @@ const Controller = (function() {
 
   function gamepadConnected(gamepad) {
     gamepads[gamepad.index] = new Gamepad(gamepad);
+    updatePolling();
   }
 
   function gamepadDisconnected(gamepad) {
     delete gamepads[gamepad.index];
+    updatePolling();
   }
 
   function analyzeGamepad(gamepad) {
@@ -90,6 +95,19 @@ const Controller = (function() {
   const POLLING_INTERVAL_MS = 16;
 
   let listenersAttached = false;
+  let watching = false;
+
+  // Only the gamepads reported by a gamepadconnected event are analyzed, so the gamepads are polled
+  // only while one is connected, instead of waking the main thread of the TV 60 times per second
+  function updatePolling() {
+    const needed = watching && Object.keys(gamepads).length > 0;
+    if (needed && !pollingInterval) {
+      pollingInterval = setInterval(pollGamepads, POLLING_INTERVAL_MS);
+    } else if (!needed && pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
 
   function startWatching() {
     // Attach the connection listeners once, even when watching is stopped and started again
@@ -102,16 +120,13 @@ const Controller = (function() {
         gamepadDisconnected(e.gamepad);
       });
     }
-    if (!pollingInterval) {
-      pollingInterval = setInterval(pollGamepads, POLLING_INTERVAL_MS);
-    }
+    watching = true;
+    updatePolling();
   }
 
   function stopWatching() {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
-    }
+    watching = false;
+    updatePolling();
   }
 
   // The WASM module polls the gamepads by itself while streaming, so the user interface stops
