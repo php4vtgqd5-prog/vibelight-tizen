@@ -25,11 +25,15 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Added a question after the first short Game Mode stream, to learn about freezes the watchdog cannot see
 - Added the detection of the Ultra Low latency mode of the WASM player, and of the Game Mode edition of VibeLight
 - Added the latency mode of the stream to the detailed statistics overlay
+- Added a greeting to the home screen with the number of PCs online
+- Added an ambient backdrop to the app list that takes the colors of the box art of the focused app
 
 ### Changed
 - Renamed the app to VibeLight with a new logo and its own package, so it installs next to Moonlight
 - Renamed the ForceGM variant to VibeLight-GameMode, which leaves the latency mode to Auto
 - Redesigned the interface with a new theme, cards that keep their shape when focused, and a loading screen with the box art of the app
+- Switched the interface to the Inter typeface, bundled with the app with its Polish letters
+- Animated the cards when they appear and when they get the focus, and enlarged the switches of the settings
 - Showed the chosen settings and how to cancel on the loading screen of a stream
 - Checked for updates on the VibeLight repository and pointed the support QR code to its guide
 - Replaced the busy-waiting frame pacer with sleeps that realign on late frames, lowering the CPU load while streaming
@@ -52,6 +56,7 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Fixed the mute key of the remote muting only once
 - Fixed the header title reverting to the app name after a change of language
 - Fixed dialogs stretching to the height of the screen on newer TVs
+- Fixed the Latin and Latin Extended subsets of the Roboto font being swapped, which showed a fallback font
 
 ## v1.17.1
 

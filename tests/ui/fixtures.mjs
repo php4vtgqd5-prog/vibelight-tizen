@@ -33,7 +33,7 @@ export const test = base.extend({
         await page.goto(harness.url(query));
         await page.waitForFunction(() => typeof isHostsLoaded !== 'undefined' && isHostsLoaded && $('#host-grid').is(':visible'));
         // The first poll of the hosts tells whether they are online
-        await page.waitForFunction(() => Object.keys(hosts).every((uid) => hosts[uid].online !== undefined));
+        await page.waitForFunction(() => Object.keys(hosts).every((uid) => hostStatus(hosts[uid]) !== 'unknown'));
         if (!gameModeQuestion) {
           await page.evaluate(() => {
             storeData(GAME_MODE_ASKED_KEY, true, null);

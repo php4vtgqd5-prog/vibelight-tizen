@@ -58,3 +58,17 @@ test('BACK stops the countdown of Resume on launch', async ({ app, page }) => {
   expect(await page.evaluate(() => isInGame)).toBe(false);
   await expect(page.locator('#exitAppDialog')).toBeHidden();
 });
+
+test('deleting the host of the last app updates the home screen at once', async ({ app, page }) => {
+  await app.open('?network=ethernet');
+  await playOnce(app, page, 20005);
+  await expect(page.locator('#continue-banner')).toBeVisible();
+  await expect(page.locator('#homeSubtitleText')).toHaveText('PCs online: 1 of 1');
+
+  await page.evaluate(() => deleteHostDialog(hosts[Object.keys(hosts)[0]]));
+  await page.locator('#continueDeleteHost').click();
+  // Well before the header refreshes the home screen on its own
+  await expect(page.locator('#continue-banner')).toBeHidden({ timeout: 3000 });
+  await expect(page.locator('#homeSubtitleText')).toHaveText('Add your PC to start streaming.', { timeout: 3000 });
+  expect(await app.currentView()).toBe('Hosts');
+});

@@ -24,6 +24,14 @@
     --vl-focus-ring: 0 0 0 3px rgba(45, 212, 240, 0.95), 0 8px 26px rgba(45, 212, 240, 0.3);
     --vl-radius: 14px;
     --vl-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --vl-font: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+/* Inter for all the text, including the components of Material Design Lite */
+body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p,
+.mdl-button, .mdl-layout-title, .mdl-dialog, .mdl-dialog__title, .mdl-menu__item,
+.mdl-switch__label, .mdl-textfield__input, .mdl-textfield__label, .mdl-snackbar__text,
+.mdl-tooltip, .mdl-card__title-text {
+    font-family: var(--vl-font);
 }
 /* =============================
    Global Styles
@@ -34,7 +42,7 @@ body {
     background-image: radial-gradient(1300px 760px at 6% -14%, rgba(99, 102, 241, 0.22), transparent 62%),
         radial-gradient(1100px 680px at 106% 114%, rgba(168, 85, 247, 0.16), transparent 60%);
     background-repeat: no-repeat;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--vl-font);
     scroll-behavior: smooth;
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -133,17 +141,18 @@ body.vl-streaming {
     padding: 0 80px 0 80px;
 }
 #header-logo {
-    width: 48px;
-    height: 48px;
-    margin: 2px 26px 2px 40px;
-    border-radius: 14px;
-    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+    width: 52px;
+    height: 52px;
+    margin: 0 24px 0 38px;
+    /* The shadow follows the squircle of the logo */
+    -webkit-filter: drop-shadow(0 4px 14px rgba(124, 92, 255, 0.55));
+    filter: drop-shadow(0 4px 14px rgba(124, 92, 255, 0.55));
 }
 #header-title {
     color: var(--vl-text);
     font-size: 2.5rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
 }
 /* The name of the application on the home screen */
 #header-title.vl-brand {
@@ -318,8 +327,8 @@ body.vl-streaming {
     margin: 0;
     padding: 24px 24px 14px;
     font-size: 2.7rem;
-    font-weight: 600;
-    letter-spacing: 0.3px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
 }
 .mdl-dialog__content {
     color: rgba(255, 255, 255, 0.9);
@@ -1785,9 +1794,9 @@ button.setting-control {
     opacity: 0;
     background-position: center;
     background-size: cover;
-    -webkit-filter: blur(6px) saturate(1.3);
-    filter: blur(6px) saturate(1.3);
-    transform: translate(-50%, -50%) scale(4.6);
+    -webkit-filter: blur(12px) saturate(1.3);
+    filter: blur(12px) saturate(1.3);
+    transform: translate(-50%, -50%) scale(5);
     transition: opacity 0.4s ease-out;
 }
 #streamLoadingBackdrop.has-art #streamLoadingBackdropArt {
@@ -1983,4 +1992,168 @@ button.setting-control {
 }
 #retryGameModeMenu {
     display: none;
+}
+/* =============================
+   Motion: cards rise into place, the focused card catches the light
+============================= */
+@keyframes vl-rise {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@keyframes vl-shine {
+    from {
+        transform: translateX(-120%) skewX(-18deg);
+    }
+    to {
+        transform: translateX(320%) skewX(-18deg);
+    }
+}
+/* Only the start of the animation is kept, so the focused card can still scale afterwards */
+#host-grid .mdl-card, #game-grid .mdl-card, #continue-banner {
+    animation: vl-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+#host-grid .mdl-card:nth-child(2), #game-grid .mdl-card:nth-child(2) { animation-delay: 0.04s; }
+#host-grid .mdl-card:nth-child(3), #game-grid .mdl-card:nth-child(3) { animation-delay: 0.08s; }
+#host-grid .mdl-card:nth-child(4), #game-grid .mdl-card:nth-child(4) { animation-delay: 0.12s; }
+#host-grid .mdl-card:nth-child(5), #game-grid .mdl-card:nth-child(5) { animation-delay: 0.16s; }
+#host-grid .mdl-card:nth-child(6), #game-grid .mdl-card:nth-child(6) { animation-delay: 0.2s; }
+#host-grid .mdl-card:nth-child(n+7), #game-grid .mdl-card:nth-child(n+7) { animation-delay: 0.24s; }
+#host-grid .mdl-card::after, #game-grid .mdl-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 6;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0) 100%);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-120%) skewX(-18deg);
+}
+#host-grid .mdl-card.hovered::after, #game-grid .mdl-card.hovered::after {
+    opacity: 1;
+    animation: vl-shine 0.9s ease-out 0.1s both;
+}
+/* =============================
+   Switches: larger toggles, easier to read from the couch
+============================= */
+.settings-options .mdl-switch__track {
+    top: -3px;
+    width: 52px;
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    transition: background 0.2s ease-out;
+}
+.settings-options .mdl-switch.is-checked .mdl-switch__track {
+    background: var(--vl-gradient);
+    box-shadow: 0 4px 14px rgba(var(--vl-accent-rgb), 0.35);
+}
+.settings-options .mdl-switch__thumb {
+    top: 0;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.settings-options .mdl-switch.is-checked .mdl-switch__thumb {
+    left: 27px;
+    background: #ffffff;
+}
+.settings-options .mdl-switch__focus-helper {
+    display: none;
+}
+/* =============================
+   Home: greeting above the hosts
+============================= */
+#home-hero {
+    width: calc(100% - 220px);
+    max-width: 1240px;
+    margin: 44px auto 0 auto;
+    text-align: center;
+    animation: vl-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+#homeGreeting {
+    color: var(--vl-text);
+    font-size: 3.2rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.8px;
+}
+#homeSubtitle {
+    margin-top: 8px;
+    color: var(--vl-text-dim);
+    font-size: 1.6rem;
+    font-weight: 500;
+}
+#homeSubtitle .home-online-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--vl-good);
+    box-shadow: 0 0 8px rgba(61, 220, 132, 0.8);
+    vertical-align: middle;
+}
+#homeSubtitle.is-offline .home-online-dot {
+    background: var(--vl-text-dim);
+    box-shadow: none;
+}
+#continue-banner {
+    margin-top: 26px;
+}
+/* =============================
+   Apps: the focused game lights up the background
+============================= */
+#ambientBackdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+body.vl-view-apps #ambientBackdrop {
+    display: block;
+}
+/* A small blurred copy of the box art scaled to the screen, cheaper than blurring the screen */
+.ambient-layer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 25%;
+    height: 25%;
+    opacity: 0;
+    background-position: center;
+    background-size: cover;
+    -webkit-filter: blur(12px) saturate(1.4);
+    filter: blur(12px) saturate(1.4);
+    transform: translate(-50%, -50%) scale(5);
+    transition: opacity 0.6s ease-out;
+    will-change: opacity;
+}
+.ambient-layer.is-visible {
+    opacity: 0.5;
+}
+#ambientBackdrop::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(13, 16, 24, 0.35) 0%, rgba(13, 16, 24, 0.7) 65%, rgba(13, 16, 24, 0.9) 100%);
 }

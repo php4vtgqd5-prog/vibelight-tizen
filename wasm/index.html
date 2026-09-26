@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VibeLight</title>
   <link rel="icon" href="static/favicon/favicon.png">
+  <link rel="stylesheet" href="static/css/inter.css">
   <link rel="stylesheet" href="static/css/roboto.css">
   <link rel="stylesheet" href="static/css/material-icons.css">
   <link rel="stylesheet" href="static/css/material.min.css">
@@ -53,6 +54,11 @@
       </div>
     </header>
     <main id="main-content" class="mdl-layout__content">
+      <!-- Greeting and state of the hosts, shown above them -->
+      <div id="home-hero" style="display: none;">
+        <div id="homeGreeting"></div>
+        <div id="homeSubtitle"><span class="home-online-dot"></span><span id="homeSubtitleText"></span></div>
+      </div>
       <!-- Last app streamed, shown above the hosts -->
       <div id="continue-banner" role="link" tabindex="0" aria-label="Continue playing" style="display: none;">
         <div id="continueArt" class="continue-art"></div>
@@ -732,6 +738,8 @@
         <p id="loadingSpinnerHint"><span class="remote-key remote-key-red"></span><span data-i18n="Cancel">Cancel</span></p>
       </div>
     </main>
+    <!-- Blurred box art of the focused app behind the Apps view -->
+    <div id="ambientBackdrop"><div class="ambient-layer"></div><div class="ambient-layer"></div></div>
     <!-- Box art of the app behind the loading screen of a stream -->
     <div id="streamLoadingBackdrop"><div id="streamLoadingBackdropArt"></div></div>
     <div id="connection-warnings"></div>

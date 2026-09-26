@@ -11,6 +11,21 @@ test('the home screen shows the paired host as online under the VibeLight header
   await expect(page.locator('#continue-banner')).toBeHidden();
 });
 
+// The app fixture only checks the errors of the page here, as the test opens it before the first poll
+test('the home screen greets and counts the hosts online once their first poll answers', async ({ app, harness, page }) => {
+  // A slow network keeps the first poll of the host waiting, as on a TV that just woke up
+  await page.goto(harness.url('?rtt=2000&jitter=0'));
+  await page.waitForFunction(() => typeof isHostsLoaded !== 'undefined' && isHostsLoaded && $('#host-grid').is(':visible'));
+  const hostCard = page.locator('#host-grid .host-container').first();
+  await expect(page.locator('#homeGreeting')).toHaveText(/^Good (morning|afternoon|evening)$/);
+  await expect(page.locator('#homeSubtitleText')).toHaveText('Looking for your PCs...');
+  await expect(hostCard).toHaveAttribute('data-status', 'unknown');
+  await expect(page.locator('#homeSubtitle')).not.toHaveClass(/is-offline/);
+
+  await expect(page.locator('#homeSubtitleText')).toHaveText('PCs online: 1 of 1');
+  await expect(hostCard).toHaveAttribute('data-status', 'online');
+});
+
 test('a host found on a fresh TV must be paired first', async ({ app, page }) => {
   await app.open('?scenario=fresh');
   const hostCard = page.locator('#host-grid .host-container').first();

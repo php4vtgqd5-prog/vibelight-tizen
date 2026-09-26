@@ -87,9 +87,104 @@ function setHeaderTitle(key, subtitle) {
   }
 }
 
+// Mark the body with the current view (hosts, apps, settings or stream) for the styles of each view
+function setViewClass(view) {
+  var body = document.body;
+  ['hosts', 'apps', 'settings', 'stream'].forEach(function(name) {
+    body.classList.remove('vl-view-' + name);
+  });
+  body.classList.add('vl-view-' + view);
+  if (view !== 'apps') {
+    Ambient.clear();
+  }
+}
+
+// Greeting of the home screen, with the number of hosts that are online
+function renderHomeHero() {
+  var hero = $('#home-hero');
+  if (!$('#host-grid').is(':visible')) {
+    hero.hide();
+    return;
+  }
+  var hour = new Date().getHours();
+  if (hour >= 4 && hour < 12) {
+    $('#homeGreeting').text(t('Good morning'));
+  } else if (hour >= 12 && hour < 18) {
+    $('#homeGreeting').text(t('Good afternoon'));
+  } else {
+    $('#homeGreeting').text(t('Good evening'));
+  }
+
+  var statuses = typeof hosts === 'object' && hosts ? Object.keys(hosts).map(function(uid) {
+    return hostStatus(hosts[uid]);
+  }) : [];
+  var online = statuses.filter(function(status) {
+    return status === 'online' || status === 'unpaired';
+  }).length;
+  var looking = statuses.indexOf('unknown') !== -1;
+  var subtitle;
+  if (statuses.length === 0) {
+    subtitle = t('Add your PC to start streaming.');
+  } else if (looking) {
+    subtitle = t('Looking for your PCs...');
+  } else {
+    subtitle = t('PCs online: %1$s of %2$s', online, statuses.length);
+  }
+  $('#homeSubtitleText').text(subtitle);
+  $('#homeSubtitle').toggleClass('is-offline', online === 0 && !looking);
+  hero.show();
+}
+
+// Background of the Apps view: a blurred copy of the box art of the focused app, cross-faded
+// between two layers when the focus settles on another app
+var Ambient = (function() {
+  var FOCUS_DELAY = 180;
+  var timer = null;
+  var visibleLayer = 0;
+  var shownArt = '';
+
+  function layers() {
+    return document.querySelectorAll('#ambientBackdrop .ambient-layer');
+  }
+
+  function show(art) {
+    var all = layers();
+    if (all.length < 2 || art === shownArt) {
+      return;
+    }
+    shownArt = art;
+    var next = 1 - visibleLayer;
+    all[next].style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
+    all[next].classList.add('is-visible');
+    all[visibleLayer].classList.remove('is-visible');
+    visibleLayer = next;
+  }
+
+  return {
+    focus: function(appId) {
+      clearTimeout(timer);
+      timer = setTimeout(function() {
+        var img = document.querySelector('#game-container-' + appId + ' img');
+        var art = img ? img.getAttribute('src') : '';
+        if (art) {
+          show(art);
+        }
+      }, FOCUS_DELAY);
+    },
+    clear: function() {
+      clearTimeout(timer);
+      shownArt = '';
+      Array.prototype.forEach.call(layers(), function(layer) {
+        layer.classList.remove('is-visible');
+      });
+    },
+  };
+})();
+
 // Texts of the interface that are not static, translated again when the language changes
 function refreshDynamicTexts() {
   setHeaderTitle(headerTitleKey, headerSubtitle);
+  renderHomeHero();
   if (typeof hosts === 'object' && hosts) {
     Object.keys(hosts).forEach(function(hostUid) {
       updateHostStatusIndicator(hosts[hostUid]);
@@ -118,7 +213,8 @@ function updateHeaderStatus() {
     icon = 'lan';
   }
   $('#header-network-icon').text(icon).toggleClass('is-offline', offline);
-  // Refresh how long ago the last app was played
+  // Refresh the greeting and how long ago the last app was played
+  renderHomeHero();
   ContinuePlaying.render();
 }
 
@@ -348,6 +444,21 @@ function delayedNavigation(callback) {
   navigationTimeout = setTimeout(callback, NAVIGATION_DELAY);
 }
 
+// Hosts whose first poll of this launch answered. Until then, the online state of a host is the
+// default of NvHTTP or the one stored by the previous launch, so it tells nothing.
+var checkedHostUids = {};
+
+// Status of a host: online, unpaired, offline, or unknown until its first poll answers
+function hostStatus(host) {
+  if (!host || !checkedHostUids[host.serverUid]) {
+    return 'unknown';
+  }
+  if (host.online === true) {
+    return host.paired ? 'online' : 'unpaired';
+  }
+  return 'offline';
+}
+
 // Updates the host status indicator based on the host's online and paired status
 function updateHostStatusIndicator(host) {
   var hostContainer = document.querySelector('#host-container-' + host.serverUid);
@@ -356,18 +467,14 @@ function updateHostStatusIndicator(host) {
     return;
   }
 
-  // The card shows the status as a colored pill: unknown until the first poll answers
-  var status = 'unknown';
-  if (host.online === true) {
-    status = host.paired ? 'online' : 'unpaired';
-  } else if (host.online === false) {
-    status = 'offline';
-  }
+  // The card shows the status as a colored pill
+  var status = hostStatus(host);
   hostContainer.setAttribute('data-status', status);
   if (label) {
     label.textContent = hostStatusLabel(status);
   }
-  // The Continue playing banner shows whether its host is online
+  // The home screen shows whether the hosts are online
+  renderHomeHero();
   ContinuePlaying.render();
 }
 
@@ -409,6 +516,7 @@ function beginBackgroundPollingOfHost(host) {
     host._memCachedApplist = null;
   }).finally(function() {
     // Update the UI after the network finishes
+    checkedHostUids[host.serverUid] = true;
     updateHostStatusIndicator(host);
 
     // Reset poll state so that recovery polls from the interval below start with
@@ -520,6 +628,8 @@ function showHostsMode() {
   $('#performance-stats').css('display', 'none');
   $('#main-content').removeClass('fullscreen');
   $('#listener').removeClass('fullscreen');
+  setViewClass('hosts');
+  renderHomeHero();
   ContinuePlaying.render();
 
   Navigation.start();
@@ -1305,9 +1415,6 @@ function addHostToGrid(host, ismDNSDiscovered) {
   // Append the host status indicator to the host container
   hostContainer.append(hostStatusIndicator);
 
-  // Set initial status
-  updateHostStatusIndicator(host);
-
   // Attach the click event listener to the host container
   hostContainer.off('click');
   hostContainer.on('click', function() {
@@ -1337,6 +1444,9 @@ function addHostToGrid(host, ismDNSDiscovered) {
 
   // Store the host object in the hosts array using its server UID as the key
   hosts[host.serverUid] = host;
+
+  // Set initial status, once the card is in the grid where the indicator looks for it
+  updateHostStatusIndicator(host);
 
   // Update the host's external IPv4 address if it was discovered via mDNS
   if (ismDNSDiscovered) {
@@ -1546,6 +1656,9 @@ function deleteHostDialog(host) {
     delete _previewApps[host.serverUid];
     savePreviewApps();
     updatePreviewData();
+    // The home screen no longer counts the host, nor offers to continue playing on it
+    renderHomeHero();
+    ContinuePlaying.render();
     // If host removed, show snackbar message
     snackbarLog('%1$s has been deleted successfully.', host.hostname);
     deleteHostOverlay.style.display = 'none';
@@ -1614,6 +1727,9 @@ function deleteAllHostsDialog() {
       _previewApps = {};
       savePreviewApps();
       updatePreviewData();
+      // The home screen no longer counts the hosts, nor offers to continue playing on them
+      renderHomeHero();
+      ContinuePlaying.render();
       deleteHostOverlay.style.display = 'none';
       deleteHostDialog.close();
       isDialogOpen = false;
@@ -1735,13 +1851,14 @@ function appSupportDialog() {
 // Handle layout elements when displaying the Settings view
 function showSettingsMode() {
   console.log('%c[index.js, showSettingsMode]', 'color: green;', 'Entering "Show Settings" mode.');
+  setViewClass('settings');
   setHeaderTitle('Settings');
   $('#header-logo').show();
   $('#main-header').show();
   $('#goBackBtn').show();
   $('#restoreDefaultsBtn').show();
   $('#main-content').children().not('#listener, #loadingSpinner, #wasmSpinner').show();
-  $('#host-grid, #continue-banner').hide();
+  $('#host-grid, #home-hero, #continue-banner').hide();
   $('#game-grid').hide();
   $('.nav-menu-parent').hide();
   $('#updateAppBtn').hide();
@@ -1765,7 +1882,7 @@ function showSettings() {
   // Hide the main header and content before showing a loading screen
   $('#main-header').children().hide();
   $('#main-header').addClass('vl-header-bare');
-  $('#host-grid, #continue-banner, #game-grid').hide();
+  $('#host-grid, #home-hero, #continue-banner, #game-grid').hide();
 
   // Show a spinner while the setting list loads
   $('#wasmSpinner').css('display', 'inline-block');
@@ -2507,13 +2624,14 @@ function sortTitles(list, sortOrder) {
 // Handle layout elements when displaying the Apps view
 function showAppsMode() {
   console.log('%c[index.js, showAppsMode]', 'color: green;', 'Entering "Show Apps" mode.');
+  setViewClass('apps');
   setHeaderTitle('Apps', api ? api.hostname : '');
   $('#header-logo').show();
   $('#main-header').show();
   $('#goBackBtn').show();
   $('#quitRunningAppBtn').show();
   $('#main-content').children().not('#listener, #loadingSpinner, #wasmSpinner').show();
-  $('#host-grid, #continue-banner').hide();
+  $('#host-grid, #home-hero, #continue-banner').hide();
   $('#settings-list').hide();
   $('.nav-menu-parent').hide();
   $('#updateAppBtn').hide();
@@ -2556,7 +2674,7 @@ function showApps(host) {
     // Hide the main header before showing a loading screen
     $('#main-header').children().hide();
     $('#main-header').addClass('vl-header-bare');
-    $('#host-grid, #continue-banner, #settings-list').hide();
+    $('#host-grid, #home-hero, #continue-banner, #settings-list').hide();
 
     // Show a spinner while the app list loads
     $('#wasmSpinner').css('display', 'inline-block');
@@ -2683,6 +2801,11 @@ function showApps(host) {
 
             // Append the game cell to the game container
             gameContainer.append(gameCell);
+
+            // Light up the background with the box art of the app while it has the focus
+            gameContainer[0].addEventListener('mouseenter', function() {
+              Ambient.focus(app.id);
+            });
 
             // Attach the click event listener to the game container
             gameContainer.off('click');
@@ -2883,6 +3006,7 @@ function hideStreamLoading() {
 // Handle layout elements when displaying the Stream view
 function showStreamMode(appId) {
   console.log('%c[index.js, showStreamMode]', 'color: green;', 'Entering "Show Stream" mode.');
+  setViewClass('stream');
   $('#main-header').hide();
   $('#main-content').children().not('#listener, #loadingSpinner').hide();
   $('#main-content').addClass('fullscreen');
