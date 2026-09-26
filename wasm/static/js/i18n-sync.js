@@ -47,7 +47,8 @@ function decodeString(value) {
 function extractFromContent(content, keys) {
   const tPattern = /\bt\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*(?:,|\))/g;
   const nPattern = /\b_n\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*,\s*(['"`])((?:\\.|(?!\3).)*)\3\s*,/g;
-  const snackbarPattern = /\bsnackbarLog(?:Long)?\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*(?:,|\))/g;
+  // Functions that translate their first argument themselves
+  const snackbarPattern = /\b(?:snackbarLog(?:Long)?|setHeaderTitle)\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*(?:,|\))/g;
   const warningTitlePattern = /\bwarningDialog\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*,/g;
   const warningDialogPattern = /\bwarningDialog\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*,\s*(['"`])((?:\\.|(?!\3).)*)\3\s*(?:,|\))/g;
   const htmlPattern = /data-i18n\s*=\s*(['"])(.*?)\1/g;

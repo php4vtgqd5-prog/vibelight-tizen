@@ -386,6 +386,7 @@
   "Version %1$s is now available! Check out the latest features & improvements.": "Version %1$s is now available! Check out the latest features & improvements.",
   "Cannot automatically check for updates at this time!": "Cannot automatically check for updates at this time!",
   "Settings have been restored to their default values.": "Settings have been restored to their default values.",
+  "Apps": "Apps",
   "Your list is currently empty. Please add your favorite apps to the list.": "Your list is currently empty. Please add your favorite apps to the list.",
   "Unable to retrieve your list of apps at this time. Please refresh the list of apps or try again later!": "Unable to retrieve your list of apps at this time. Please refresh the list of apps or try again later!",
   "No app is currently running.": "No app is currently running.",
