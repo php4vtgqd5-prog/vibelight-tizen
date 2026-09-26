@@ -78,6 +78,7 @@ var StatsOverlay = (function() {
         row(escapeHtml(t('Decoder submit time')), 'sub') +
         row(escapeHtml(t('Key frames')), 'idr') +
         row(escapeHtml(t('Audio drops / errors')), 'audio') +
+        row(escapeHtml(t('Latency mode')), 'latency') +
         row(escapeHtml(t('Session time')), 'time') +
         graph(escapeHtml(t('Frame rate')), 'ren') +
         graph(escapeHtml(t('Bitrate')), 'mbps') +
@@ -182,6 +183,7 @@ var StatsOverlay = (function() {
       setField(target, 'sub', formatNumber(sample.sub, 1) + ' ms', level(sample.sub, 4, 10));
       setField(target, 'idr', String(sample.idr), sample.idr > 0 ? 'v-warn' : '');
       setField(target, 'audio', sample.aDrop + ' / ' + sample.aErr, sample.aDrop + sample.aErr > 0 ? 'v-warn' : '');
+      setField(target, 'latency', sample.lat ? t('Ultra Low (Game Mode)') : t('Low'), sample.vErr > 0 ? 'v-warn' : '');
       setField(target, 'time', StreamStats.formatDuration(sample.t), '');
 
       var graphs = [
@@ -310,6 +312,7 @@ var StreamSessionStats = (function() {
       if (typeof onStreamStatsSample === 'function') {
         onStreamStatsSample(sample, session);
       }
+      GameMode.onStatsSample(sample);
     },
     current: function() {
       return session;
@@ -439,6 +442,7 @@ var pendingSessionSummary = null;
 // A stream that is restarted by the application is kept in the history, but not summarized
 function finishStreamStatistics(errorCode, isRestart) {
   var summary = StreamSessionStats.end(errorCode);
+  GameMode.onStreamEnded(summary, errorCode, currentStreamConfig, isRestart);
   if (!summary || !summary.worthKeeping) {
     pendingSessionSummary = null;
     return null;
@@ -455,6 +459,10 @@ function finishStreamStatistics(errorCode, isRestart) {
 function showPendingSessionSummary() {
   var summary = pendingSessionSummary;
   pendingSessionSummary = null;
+  // A short Game Mode stream leads to a question about a frozen video instead of its summary
+  if (GameMode.showPendingQuestion()) {
+    return;
+  }
   if (!summary || isDialogOpen) {
     return;
   }

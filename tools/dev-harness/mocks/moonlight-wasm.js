@@ -12,7 +12,9 @@
 //   &capacity=80       Throughput of the simulated network in Mbps, frames are lost above it
 //   &loss=0            Random frame loss of the simulated network, in percent
 //   &renderLimit=0     Highest frame rate the simulated TV decoder renders, 0 for no limit
-//   &freeze=0          Simulate a video pipeline that stops after the first frame
+//   &freeze=0          1 simulates a TV whose video stops after the first frame in the Ultra Low
+//                      latency mode of Game Mode: the player then rejects the frames
+//   &ultraLow=1        0 simulates a WASM player that reports no Ultra Low latency mode
 //   &running=20002     Id of an app that already runs on the host
 //
 // Nothing here is shipped with the widget.
@@ -166,7 +168,8 @@
       config: config,
       startedAt: 0,
       timer: null,
-      firstFrameOnly: params.get('freeze') === '1',
+      // The video of a TV that freezes in the Ultra Low latency mode stops after the first frame
+      frozen: params.get('freeze') === '1' && !!config.latencyMode,
     };
     session = stream;
 
@@ -193,6 +196,13 @@
     var renderLimit = numberParam('renderLimit', 0);
     var received = config.fps * (1 - lossPercent / 100) * (0.995 + Math.random() * 0.01);
     var rendered = renderLimit > 0 ? Math.min(received, renderLimit) : received;
+    var elapsed = (Date.now() - stream.startedAt) / 1000;
+    if (stream.frozen && elapsed > 1) {
+      // The player keeps the first frame on screen and rejects the following ones
+      rendered = received * 0.02;
+    } else {
+      stream.position = elapsed;
+    }
     var hostLatency = 3 + Math.random() * 2 + (config.width * config.height > 2073600 ? 2 : 0);
     var stats = {
       t: (Date.now() - stream.startedAt) / 1000,
@@ -219,6 +229,9 @@
       aDrop: 0,
       aErr: 0,
       idr: lossPercent > 10 ? 1 : 0,
+      vErr: stream.frozen && elapsed > 1 ? 12 : 0,
+      pos: stream.position || 0,
+      lat: config.latencyMode ? 1 : 0,
     };
     global.handleMessage('StatsJson: ' + JSON.stringify(stats));
     if (stats.poor && !stream.warned) {
@@ -357,7 +370,7 @@
     },
     sendKeyboardEvent: function() {},
     getPlatformCapabilities: function() {
-      return { known: true, ultraLowLatency: parseFloat(params.get('platform') || '6.5') >= 6.0 };
+      return { known: true, ultraLowLatency: params.get('ultraLow') !== '0' && parseFloat(params.get('platform') || '6.5') >= 6.0 };
     },
   });
 

@@ -78,6 +78,12 @@ static StatsWindow s_StatsWindow;
 static uint64_t s_StatsStreamStartMs = 0;
 static int m_LastFrameNumber = 0;
 
+std::atomic<uint32_t> g_VideoAppendErrors{0};
+
+// Last playback position reported by the media source, in seconds, or -1 before the first report.
+// A position that stops moving while frames are appended means the TV stopped showing the video.
+static std::atomic<double> s_PlaybackPosition{-1.0};
+
 MoonlightInstance::SourceListener::SourceListener(
   MoonlightInstance* instance
 ) : m_Instance(instance) {}
@@ -101,6 +107,10 @@ void MoonlightInstance::SourceListener::OnSourceClosed() {
   std::unique_lock<std::mutex> lock(m_Instance->m_Mutex);
   m_Instance->m_EmssReadyState = EmssReadyState::kClosed;
   m_Instance->m_EmssStateChanged.notify_all();
+}
+
+void MoonlightInstance::SourceListener::OnPlaybackPositionChanged(samsung::wasm::Seconds new_time) {
+  s_PlaybackPosition.store(new_time.count());
 }
 
 MoonlightInstance::AudioTrackListener::AudioTrackListener(
@@ -148,6 +158,12 @@ void MoonlightInstance::VideoTrackListener::OnSessionIdChanged(samsung::wasm::Se
   ClLogMessage("VIDEO ElementaryMediaTrack::OnSessionIdChanged\n");
   std::unique_lock<std::mutex> lock(m_Instance->m_Mutex);
   m_Instance->m_VideoSessionId.store(new_session_id);
+}
+
+void MoonlightInstance::VideoTrackListener::OnAppendError(samsung::wasm::OperationResult result) {
+  // The player accepted a packet it then failed to decode, reported in the statistics
+  ClLogMessage("VIDEO ElementaryMediaTrack::OnAppendError %d\n", static_cast<int>(result));
+  g_VideoAppendErrors++;
 }
 
 void MoonlightInstance::DidChangeFocus(bool got_focus) {
@@ -351,6 +367,8 @@ int MoonlightInstance::VidDecSetup(int videoFormat, int width, int height, int r
   s_StatsStreamStartMs = 0;
   g_AudioPacketsDropped = 0;
   g_AudioErrors = 0;
+  g_VideoAppendErrors = 0;
+  s_PlaybackPosition = -1.0;
   g_Instance->m_ConnectionPoor = false;
 
   // Reset last frame number to prevent massive integer underflow on subsequent streams
@@ -599,7 +617,8 @@ void MoonlightInstance::ReportStreamStats(uint64_t nowMs) {
     "\"rx\":%.2f,\"dec\":%.2f,\"ren\":%.2f,\"mbps\":%.2f,\"loss\":%.2f,\"fail\":%.2f,"
     "\"rtt\":%u,\"rttv\":%u,\"host\":%.1f,\"hostMin\":%.1f,\"hostMax\":%.1f,"
     "\"reasm\":%.2f,\"queue\":%.2f,\"pace\":%.2f,\"sub\":%.2f,"
-    "\"poor\":%d,\"aDrop\":%u,\"aErr\":%u,\"idr\":%u}",
+    "\"poor\":%d,\"aDrop\":%u,\"aErr\":%u,\"idr\":%u,"
+    "\"vErr\":%u,\"pos\":%.2f,\"lat\":%d}",
     (double)(nowMs - s_StatsStreamStartMs) / 1000.0, s_Width, s_Height, s_Framerate,
     VideoFormatName(s_VideoFormat), LiGetCurrentHostDisplayHdrMode() ? 1 : 0,
     window.receivedFrames / elapsedSeconds,
@@ -612,7 +631,8 @@ void MoonlightInstance::ReportStreamStats(uint64_t nowMs) {
     (double)window.hostLatencyMin / 10.0, (double)window.hostLatencyMax / 10.0,
     reassemblyAverage, queueAverage, pacerAverage, submitAverage,
     g_Instance->m_ConnectionPoor.load() ? 1 : 0,
-    g_AudioPacketsDropped.exchange(0), g_AudioErrors.exchange(0), window.idrFrames);
+    g_AudioPacketsDropped.exchange(0), g_AudioErrors.exchange(0), window.idrFrames,
+    g_VideoAppendErrors.exchange(0), s_PlaybackPosition.load(), g_Instance->m_GameModeEnabled ? 1 : 0);
 
   // Posted asynchronously, so the thread submitting the video never waits for the main thread
   PostToJsAsync(json);

@@ -530,16 +530,26 @@
             </div>
             <div class="setting-option">
               <label data-i18n="Game mode">Game mode</label>
-              <span class="mdl-list__item-text-body" data-i18n="Enable for ultra low latency with game mode or disable for low latency with post-processing video enhancements.">
-                Enable for ultra low latency with game mode or disable for low latency with post-processing video enhancements.
+              <span class="mdl-list__item-text-body" data-i18n="Game Mode streams with the Ultra Low latency mode of the TV. Auto uses it only where it works and switches a stream to low latency when its video freezes.">
+                Game Mode streams with the Ultra Low latency mode of the TV. Auto uses it only where it works and switches a stream to low latency when its video freezes.
               </span>
               <div id="gameModeMenu">
-                <label id="gameModeBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect" for="gameModeSwitch">
-                  <input type="checkbox" id="gameModeSwitch" class="mdl-switch__input">
-                  <span class="mdl-switch__label" data-i18n="Allow game mode for optimal latency and performance while streaming">
-                    Allow game mode for optimal latency and performance while streaming
-                  </span>
-                </label>
+                <button type="button" id="selectGameMode" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control setting-select" data-value="auto" data-select-menu="gameModeMenu" data-i18n="Auto (recommended)">Auto (recommended)</button>
+              </div>
+              <ul class="gameModeMenu setting-menu mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="selectGameMode">
+                <li class="mdl-menu__item" data-value="auto" data-i18n="Auto (recommended)">Auto (recommended)</li>
+                <li class="mdl-menu__item" data-value="on" data-i18n="Always on">Always on</li>
+                <li class="mdl-menu__item" data-value="off" data-i18n="Off">Off</li>
+              </ul>
+              <div id="gameModeStatus" class="game-mode-status">
+                <i class="material-icons">sports_esports</i>
+                <span id="gameModeStatusText"></span>
+              </div>
+              <div id="retryGameModeMenu">
+                <button type="button" id="retryGameModeBtn" class="mdl-button mdl-js-button mdl-js-ripple-effect setting-control" aria-label="Try Game Mode again">
+                  <span data-i18n="Try Game Mode again on this TV">Try Game Mode again on this TV</span>
+                  <i class="material-icons setting-control-icon">restart_alt</i>
+                </button>
               </div>
             </div>
           </div>
@@ -740,6 +750,8 @@
   <script type="text/javascript" src="platform/autotune-core.js"></script>
   <script type="text/javascript" src="platform/autotune.js"></script>
   <script type="text/javascript" src="platform/continue.js"></script>
+  <script type="text/javascript" src="platform/gamemode-core.js"></script>
+  <script type="text/javascript" src="platform/gamemode.js"></script>
   <script type="text/javascript" src="platform/index.js"></script>
   <script type="text/javascript" src="platform/navigation.js"></script>
   <script type="text/javascript" src="platform/remote_controller.js"></script>

@@ -76,11 +76,26 @@ instaluje się obok Moonlight; hosty trzeba sparować w VibeLight ponownie.
 
 ## Tryb gry
 
-Tryb gry wyłącza przetwarzanie obrazu w telewizorze, co daje najniższe opóźnienie. VibeLight włącza
-go opcją *Tryb gry* (Ustawienia obrazu), która korzysta z trybu Ultra Low Latency odtwarzacza WASM
-Samsunga. Niektóre telewizory, zwłaszcza z Tizen 9, nie wchodzą w ten sposób w tryb gry: zainstaluj
-wtedy `VibeLight-GameMode.wgt`, który deklaruje tryb gry w pakiecie, więc telewizor włącza go przy
-starcie aplikacji.
+Tryb gry streamuje w trybie ultraniskiego opóźnienia odtwarzacza WASM Samsunga, który pomija
+przetwarzanie obrazu w telewizorze. Nie działa na każdym telewizorze: odtwarzacz Tizen 5.5 go nie
+ma, a na Tizen 9 zatrzymuje obraz na pierwszej klatce albo zostawia czarny ekran. Opcja *Tryb gry*
+(Ustawienia obrazu) radzi sobie z tym:
+
+- **Auto** (domyślnie) włącza tryb gry tylko tam, gdzie działa: nie na Tizen 5.5, nie na Tizen 9 i
+  nowszych, nie gdy odtwarzacz WASM zgłasza brak tego trybu i nie na telewizorze, na którym obraz
+  się zawiesił.
+- **Zawsze włączony** wymusza go wszędzie tam, gdzie odtwarzacz go ma, **Wyłączony** nigdy go nie używa.
+- Strażnik pilnuje każdego streamu w trybie gry: gdy obraz się zawiesi (odtwarzacz odrzuca klatki,
+  zgłasza błędy dekodowania albo przestaje odtwarzać), VibeLight uruchamia stream ponownie w trybie
+  niskiego opóźnienia i zapamiętuje to dla tego telewizora. *Spróbuj ponownie trybu gry na tym
+  telewizorze* kasuje tę informację.
+- Po pierwszym krótkim streamie w trybie gry, który sam zakończysz, VibeLight raz zapyta, czy obraz
+  się zawiesił, na wypadek zawieszeń, których strażnik nie widzi.
+- Szczegółowa nakładka statystyk pokazuje tryb opóźnienia streamu.
+
+Na Tizen 9 zainstaluj `VibeLight-GameMode.wgt`, aby mimo to mieć tryb gry: deklaruje on tryb gry w
+pakiecie, więc telewizor przełącza się w niego przy starcie VibeLight, a streamy używają trybu
+niskiego opóźnienia.
 
 ## Rozwój
 

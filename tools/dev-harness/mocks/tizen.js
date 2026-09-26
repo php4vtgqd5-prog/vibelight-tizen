@@ -5,6 +5,7 @@
 // the query string of the page:
 //
 //   ?platform=6.5    Tizen version reported by tizen.systeminfo (default 6.5)
+//   &edition=gamemode  The installed package is the Game Mode edition (its metadata asks for Game Mode)
 //   &panel=4k        Panel of the TV: fhd, 4k or 8k (default 4k)
 //   &hdr=1           Whether the TV reports HDR support (default 1)
 //   &network=wifi    Active connection: ethernet or wifi (default wifi)
@@ -50,7 +51,9 @@
           getRequestedAppControl: function() { return null; },
         };
       },
-      getAppMetaData: function() { return []; },
+      getAppMetaData: function() {
+        return params.get('edition') === 'gamemode' ? [{ key: 'http://samsung.com/tv/metadata/use.game.mode', value: 'true' }] : [];
+      },
       launchAppControl: function(appControl, id, onSuccess, onError) {
         asyncCall(onError, { name: 'NotFoundError', message: 'No background service in the harness' });
       },

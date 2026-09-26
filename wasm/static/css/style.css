@@ -1212,6 +1212,8 @@ button.setting-control {
     font-size: 1.45rem;
     letter-spacing: 0.5px;
     text-indent: 36px;
+    /* Center the label in the 60px control, MDL buttons are laid out for 36px */
+    line-height: 58px;
 }
 .setting-select, .setting-select:hover, .setting-select:focus {
     background: url('../res/ic_arrow_drop_down_48px.svg') 94.8% 50% no-repeat var(--vl-surface-2);
@@ -1455,7 +1457,7 @@ button.setting-control {
 #sortAppsListBtn, #optimizeGamesBtn, #removeAllHostsBtn, #rumbleFeedbackBtn, #mouseEmulationBtn,
 #flipABfaceButtonsBtn, #flipXYfaceButtonsBtn, #selectAudioBackend, #selectAudio, #audioSyncBtn,
 #selectAudioJitter, #playHostAudioBtn,
-#selectCodec, #hdrModeBtn, #fullRangeBtn, #gameModeBtn, #unlockAllFpsBtn, #optimizeBitrateBtn,
+#selectCodec, #hdrModeBtn, #fullRangeBtn, #unlockAllFpsBtn, #optimizeBitrateBtn,
 #disableWarningsBtn, #performanceStatsBtn, #navigationGuideBtn, #checkUpdatesBtn, #restartAppBtn {
     color: var(--vl-text);
     background-color: var(--vl-surface-2);
@@ -1490,11 +1492,6 @@ button.setting-control {
 .unsupported-resolution[disabled]:focus, .unsupported-resolution[disabled]:active {
 	color: #dedede !important;
     background-color: #4a5470 !important;
-}
-#gameModeBtn.is-disabled.hovered, #gameModeBtn.is-disabled:hover,
-#gameModeBtn.is-disabled:focus, #gameModeBtn.is-disabled:active {
-    box-shadow: 0 0 2px 3px rgba(170, 170, 170, 1) !important;
-    cursor: not-allowed;
 }
 .mdl-menu__outline {
     color: #fff;
@@ -1595,7 +1592,7 @@ button.setting-control {
 #flipXYfaceButtonsBtn:hover, #flipXYfaceButtonsBtn:focus, #selectAudioBackend:hover, #selectAudioBackend:focus, #selectAudio:hover,
 #selectAudio:focus, #audioSyncBtn:hover, #audioSyncBtn:focus, #selectAudioJitter:hover, #selectAudioJitter:focus,
 #playHostAudioBtn:hover, #playHostAudioBtn:focus, #selectCodec:hover, #selectCodec:focus, #hdrModeBtn:hover, #hdrModeBtn:focus, #fullRangeBtn:hover,
-#fullRangeBtn:focus, #gameModeBtn:hover, #gameModeBtn:focus, #unlockAllFpsBtn:hover, #unlockAllFpsBtn:focus, #optimizeBitrateBtn:hover,
+#fullRangeBtn:focus, #unlockAllFpsBtn:hover, #unlockAllFpsBtn:focus, #optimizeBitrateBtn:hover,
 #optimizeBitrateBtn:focus, #disableWarningsBtn:hover, #disableWarningsBtn:focus, #performanceStatsBtn:hover, #performanceStatsBtn:focus,
 #systemInfoBtn:hover, #systemInfoBtn:focus, #navigationGuideBtn:hover, #navigationGuideBtn:focus, #checkUpdatesBtn:hover, #checkUpdatesBtn:focus,
 #restartAppBtn:hover, #restartAppBtn:focus {
@@ -1956,4 +1953,34 @@ button.setting-control {
     color: #0d1018;
     background: var(--vl-accent);
     box-shadow: 0 6px 22px rgba(var(--vl-accent-rgb), 0.45);
+}
+/* =============================
+   Game Mode
+============================= */
+.game-mode-status {
+    display: flex;
+    align-items: center;
+    margin: 14px 0 12px 0;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--vl-border);
+    color: var(--vl-text-2);
+    font-size: 1.35rem;
+    line-height: 1.45;
+}
+.game-mode-status .material-icons {
+    flex: none;
+    margin-right: 14px;
+    color: var(--vl-text-dim);
+}
+.game-mode-status.is-active {
+    background: rgba(61, 220, 132, 0.1);
+    border-color: rgba(61, 220, 132, 0.4);
+}
+.game-mode-status.is-active .material-icons {
+    color: var(--vl-good);
+}
+#retryGameModeMenu {
+    display: none;
 }

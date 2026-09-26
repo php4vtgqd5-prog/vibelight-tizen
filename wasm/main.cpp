@@ -24,6 +24,14 @@ extern char* g_UniqueId;
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+// The feature detection API of the WASM player only exists in newer SDKs
+#if defined(__has_include)
+#if __has_include(<samsung/wasm/emss_version_info.h>)
+#include <samsung/wasm/emss_version_info.h>
+#define HAS_EMSS_VERSION_INFO 1
+#endif
+#endif
+
 // Requests the Wasm module to connect to the specified server
 #define MSG_START_REQUEST "startRequest"
 // Requests the Wasm module to stop streaming
@@ -498,7 +506,12 @@ MessageResult MoonlightInstance::StartStream(std::string host, int httpPort, std
   // Manage gamepad input states based on selected settings
   HandleGamepadInputState(rumbleFeedback, mouseEmulation, flipABfaceButtons, flipXYfaceButtons);
 
-  // Apply the desired latency mode ​based on the toggle switch state
+  // Game Mode uses the Ultra Low latency mode, unless the player of the TV reports it lacks it
+  const PlatformCapabilities capabilities = GetPlatformCapabilities();
+  if (gameMode && capabilities.known && !capabilities.ultraLowLatency) {
+    PostToJs("The WASM player of this TV has no Ultra Low latency mode, using the Low latency mode");
+    gameMode = false;
+  }
   EmssLatencyMode selectedLatencyMode = gameMode ? EmssLatencyMode::kUltraLow : EmssLatencyMode::kLow;
   PostToJs(gameMode ? "Selecting the latency mode to: LATENCY_MODE_ULTRA_LOW" : "Selecting the latency mode to: LATENCY_MODE_LOW");
   // Create the media source with the selected latency and rendering modes
@@ -753,6 +766,15 @@ void toggleStats() {
   g_Instance->TogglePerformanceStats();
 }
 
+PlatformCapabilities GetPlatformCapabilities() {
+#ifdef HAS_EMSS_VERSION_INFO
+  const samsung::wasm::EmssVersionInfo info = samsung::wasm::EmssVersionInfo::Create();
+  return {true, info.has_ultra_low_latency};
+#else
+  return {false, false};
+#endif
+}
+
 void stun(int callbackId) {
   g_Instance->STUN(callbackId);
 }
@@ -817,6 +839,10 @@ EMSCRIPTEN_BINDINGS(handle_message) {
   emscripten::function("stopStream", &stopStream);
   emscripten::function("cancelRequest", &cancelRequest);
   emscripten::function("toggleStats", &toggleStats);
+  emscripten::value_object<PlatformCapabilities>("PlatformCapabilities")
+    .field("known", &PlatformCapabilities::known)
+    .field("ultraLowLatency", &PlatformCapabilities::ultraLowLatency);
+  emscripten::function("getPlatformCapabilities", &GetPlatformCapabilities);
   emscripten::function("stun", &stun);
   emscripten::function("pair", &pair);
   emscripten::function("wakeOnLan", &wakeOnLan);

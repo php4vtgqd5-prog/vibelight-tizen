@@ -28,6 +28,9 @@
     rtt: 0, rttv: 0, host: 0, hostMin: 0, hostMax: 0,
     reasm: 0, queue: 0, pace: 0, sub: 0,
     poor: 0, aDrop: 0, aErr: 0, idr: 0,
+    // Decoding errors of the video player, its playback position (-1 when it reports none), and
+    // whether the stream uses the Ultra Low latency mode of Game Mode
+    vErr: 0, pos: -1, lat: 0,
   };
 
   function toNumber(value, fallback) {

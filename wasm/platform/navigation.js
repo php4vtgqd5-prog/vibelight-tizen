@@ -56,17 +56,6 @@ function clickElement(target) {
   // Prevent clicking if the element is disabled based on common disabled states
   if (element.disabled || element.getAttribute('aria-disabled') === 'true' || element.classList.contains('is-disabled')) {
     console.warn('%c[navigation.js, clickElement]', 'color: gray;', 'Cannot click the disabled target element:', element);
-    // Check if the disabled element is the Game Mode switch
-    if (element.id === 'gameModeBtn' && parseFloat(platformVer) === 5.5) {
-      // Show a warning message when attempting to enable game mode on Tizen 5.5 platform
-      setTimeout(() => {
-        warningDialog(t('Unsupported Feature'),
-          t('Game Mode (Ultra Low Latency) is not supported on Tizen %1$s due to platform limitations and lack of support from the WASM player.', platformVer) + 
-          t('Attempting to enable this option will have no effect, as the decoder will force a fallback to standard Low Latency mode to maintain streaming stability.<br><br>') + 
-          t('Since the Game Mode cannot be enabled, you may experience slightly higher latency while streaming. To further reduce latency, it is highly recommended to open your TV\'s Picture Settings menu and disable post-processing features such as <b>Picture Clarity</b>, <b>Contrast Enhancer</b>, and other video enhancements.')
-        );
-      }, 250);
-    }
     return;
   }
   // If inside an MDL menu, use the menu item itself for proper behavior
@@ -744,8 +733,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   PairingDialog: {
@@ -775,8 +765,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   AutoWolDialog: {
@@ -815,8 +806,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   HostMenuDialog: {
@@ -848,8 +840,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   DeleteHostDialog: {
@@ -882,8 +875,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   HostDetailsDialog: {
@@ -913,8 +907,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   MoonlightSupportDialog: {
@@ -944,8 +939,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   Settings: {
@@ -1476,8 +1472,8 @@ const Views = {
       'selectCodec',
       'hdrModeBtn',
       'fullRangeBtn',
-      'gameModeBtn'
-    ]),
+      'selectGameMode'
+    ].concat($('#retryGameModeMenu').is(':visible') ? ['retryGameModeBtn'] : [])),
     up: function() {
       this.view.prevOption();
       focusElement(this.view.current());
@@ -1652,8 +1648,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   UpdateMoonlightDialog: {
@@ -1683,8 +1680,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   RestoreDefaultsDialog: {
@@ -1717,8 +1715,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   Apps: {
@@ -1832,20 +1831,19 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   WarningDialog: {
     view: new ListView(() => {
-      // Dynamically return the visible buttons
+      // The buttons the dialog shows, also while it closes and its view is left
       var buttons = [];
-      if ($('#continueWarning').is(':visible')) {
+      if ($('#continueWarning').css('display') !== 'none') {
         buttons.push('continueWarning');
       }
-      if ($('#closeWarning').is(':visible')) {
-        buttons.push('closeWarning');
-      }
+      buttons.push('closeWarning');
       return buttons;
     }),
     up: function() {},
@@ -1880,8 +1878,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   RestartMoonlightDialog: {
@@ -1914,8 +1913,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
   ExitMoonlightDialog: {
@@ -1948,8 +1948,9 @@ const Views = {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   },
 };
@@ -2062,8 +2063,9 @@ function createDialogView(buttonIds, backButtonId) {
       setTimeout(() => focusElement(this.view.current()), 100);
     },
     leave: function() {
-      unmark(this.view.current());
-      setTimeout(() => blurElement(this.view.current()), 100);
+      const current = this.view.current();
+      unmark(current);
+      setTimeout(() => blurElement(current), 100);
     },
   };
 }
@@ -2087,6 +2089,7 @@ Views.AutoTuneSettings = createSettingsCategoryView(() => [
   'resetAutoTuneBtn'
 ]);
 Views.SelectAutoTuneGoalMenu = createSelectMenuView('autoTuneGoalMenu', 'selectAutoTuneGoal');
+Views.SelectGameModeMenu = createSelectMenuView('gameModeMenu', 'selectGameMode');
 Views.AutoTuneDialog = createDialogView(['applyAutoTune', 'closeAutoTune'], 'closeAutoTune');
 
 const Navigation = (function() {

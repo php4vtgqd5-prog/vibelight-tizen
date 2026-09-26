@@ -27,17 +27,24 @@ export const test = base.extend({
     const app = {
       page,
 
-      // Open the widget and wait for the saved hosts
-      async open(query = '') {
+      // Open the widget and wait for the saved hosts. Short streams in Game Mode lead to a question
+      // about a frozen video once per TV, which only the tests of that question keep.
+      async open(query = '', { gameModeQuestion = false } = {}) {
         await page.goto(harness.url(query));
         await page.waitForFunction(() => typeof isHostsLoaded !== 'undefined' && isHostsLoaded && $('#host-grid').is(':visible'));
         // The first poll of the hosts tells whether they are online
         await page.waitForFunction(() => Object.keys(hosts).every((uid) => hosts[uid].online !== undefined));
+        if (!gameModeQuestion) {
+          await page.evaluate(() => {
+            storeData(GAME_MODE_ASKED_KEY, true, null);
+            GameMode.setAsked(true);
+          });
+        }
       },
 
       // Reload the widget, keeping its stored data like a TV restarting the app
-      async relaunch(query = '') {
-        await app.open(query);
+      async relaunch(query = '', options = {}) {
+        await app.open(query, options);
       },
 
       // Name of the navigation view that has the focus

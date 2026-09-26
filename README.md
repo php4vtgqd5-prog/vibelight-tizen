@@ -80,11 +80,23 @@ again in VibeLight.
 
 ## Game Mode
 
-Game Mode makes the TV skip its picture processing for the lowest latency. VibeLight asks for it
-through the *Game mode* setting (Video settings), which uses the Ultra Low Latency mode of the
-Samsung WASM player. Some TVs, notably with Tizen 9, do not enter Game Mode that way: install
-`VibeLight-GameMode.wgt` instead, which declares Game Mode in its package so that the TV turns it on
-when the app starts.
+Game Mode streams with the Ultra Low latency mode of the Samsung WASM player, which skips the
+picture processing of the TV. It does not work on every TV: the player of Tizen 5.5 does not have
+it, and on Tizen 9 it freezes the video on its first frame or leaves it black. The *Game mode*
+setting (Video settings) takes care of that:
+
+- **Auto** (the default) uses Game Mode only where it works: not on Tizen 5.5, not on Tizen 9 and
+  newer, not when the WASM player reports that it lacks the mode, and not on a TV where it froze.
+- **Always on** forces it wherever the player has it, **Off** never uses it.
+- A watchdog follows every Game Mode stream: when its video freezes (the player rejects the frames,
+  reports decoding errors or stops its playback), VibeLight restarts the stream in the Low latency
+  mode and remembers it for this TV. *Try Game Mode again on this TV* forgets it.
+- After the first short Game Mode stream you stop yourself, VibeLight asks once whether the video
+  froze, for freezes the watchdog cannot see.
+- The detailed statistics overlay shows the latency mode of the stream.
+
+On Tizen 9, install `VibeLight-GameMode.wgt` to get Game Mode anyway: it declares Game Mode in its
+package, so the TV switches to it when VibeLight starts, while the streams use the Low latency mode.
 
 ## Development
 

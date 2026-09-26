@@ -57,6 +57,17 @@ struct MessageResult {
 extern std::atomic<uint32_t> g_AudioPacketsDropped;
 extern std::atomic<uint32_t> g_AudioErrors;
 
+// Video packets the WASM player failed to decode after accepting them, since the last report
+extern std::atomic<uint32_t> g_VideoAppendErrors;
+
+// Features of the WASM player of the TV, as far as the SDK the module was built with can tell
+struct PlatformCapabilities {
+  bool known;           // Whether the player reported its features (EmssVersionInfo)
+  bool ultraLowLatency; // Whether it offers the Ultra Low latency mode used for Game Mode
+};
+
+PlatformCapabilities GetPlatformCapabilities();
+
 enum class LoadResult {
   Success, CertErr, PrivateKeyErr
 };
@@ -164,6 +175,7 @@ class MoonlightInstance {
     void OnSourceOpen() override;
     void OnSourceOpenPending() override;
     void OnSourceClosed() override;
+    void OnPlaybackPositionChanged(samsung::wasm::Seconds new_time) override;
   private:
     MoonlightInstance* m_Instance;
   };
@@ -184,6 +196,7 @@ class MoonlightInstance {
     void OnTrackOpen() override;
     void OnTrackClosed(EmssTrackCloseReason) override;
     void OnSessionIdChanged(samsung::wasm::SessionId new_session_id) override;
+    void OnAppendError(samsung::wasm::OperationResult result) override;
   private:
     MoonlightInstance* m_Instance;
   };

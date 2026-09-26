@@ -329,6 +329,8 @@ function prepareStreamConfig(host, overrides) {
     if (overrides && overrides.videoCodec) {
       config.videoCodec = overrides.videoCodec;
     }
+    // The latency mode, Low or Ultra Low (Game Mode)
+    GameMode.applyToConfig(config, overrides);
     return config;
   };
   if (!AutoTune.isEnabled()) {
@@ -350,7 +352,8 @@ function codecLabel(codec) {
 // Short description of a stream configuration, shown while the stream starts
 function describeStreamConfig(config) {
   return config.width + '×' + config.height + ' · ' + config.fps + ' FPS · ' + codecLabel(config.videoCodec) +
-    (config.hdrMode ? ' HDR' : '') + ' · ' + (Math.round(config.bitrate / 100) / 10) + ' Mbps';
+    (config.hdrMode ? ' HDR' : '') + ' · ' + (Math.round(config.bitrate / 100) / 10) + ' Mbps' +
+    (config.gameMode ? ' · ' + t('Game Mode') : '');
 }
 
 // Hooks called by stats.js ----------------------------------------------------------------------

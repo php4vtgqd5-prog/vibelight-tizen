@@ -31,7 +31,9 @@ The page accepts options in its query string, for example
 | `capacity` | `80` | Throughput of the simulated network (Mbps), frames are lost above it |
 | `loss` | `0` | Random frame loss of the simulated network (%) |
 | `renderLimit` | `0` | Highest frame rate the simulated TV decoder renders (0 for no limit) |
-| `freeze` | `0` | `1` simulates a video pipeline that stops after the first frame |
+| `freeze` | `0` | `1` simulates a TV whose video stops after the first frame in the Ultra Low latency mode of Game Mode |
+| `ultraLow` | `1` | `0` simulates a WASM player that reports no Ultra Low latency mode |
+| `edition` | none | `gamemode` simulates the Game Mode edition, whose metadata asks the TV for Game Mode |
 | `running` | none | Id of an app that already runs on the host, e.g. `20002` |
 | `locale` | `en-US` | Language of the TV, e.g. `pl-PL` or `pt-BR` |
 | `version` | `2.0.0` | Version of the installed app |

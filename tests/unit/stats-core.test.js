@@ -25,6 +25,16 @@ test('parseSample reads a StatsJson payload and fills missing fields', () => {
   assert.equal(parsed.poor, 0);
 });
 
+test('parseSample keeps the fields the Game Mode watchdog reads', () => {
+  const parsed = StreamStats.parseSample('{"t":3,"vErr":4,"pos":2.5,"lat":1}');
+  assert.equal(parsed.vErr, 4);
+  assert.equal(parsed.pos, 2.5);
+  assert.equal(parsed.lat, 1);
+  const older = StreamStats.parseSample('{"t":3}');
+  assert.equal(older.pos, -1, 'a module that reports no position');
+  assert.equal(older.lat, 0);
+});
+
 test('parseSample rejects malformed payloads', () => {
   assert.equal(StreamStats.parseSample('not json'), null);
   assert.equal(StreamStats.parseSample('42'), null);

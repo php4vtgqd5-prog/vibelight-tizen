@@ -20,9 +20,15 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Added a clock and the connection type to the header, and the online, offline or not paired state to the host cards
 - Added a development harness that runs the interface in a desktop browser with a simulated TV and host
 - Added continuous integration with lint, unit tests, UI tests, a syntax check of the WebAssembly module and a widget build
+- Added an Auto mode to the Game mode setting, the new default, which uses Game Mode only on TVs where it works
+- Added a watchdog that restarts a Game Mode stream in low latency mode when its video freezes, and remembers the TV
+- Added a question after the first short Game Mode stream, to learn about freezes the watchdog cannot see
+- Added the detection of the Ultra Low latency mode of the WASM player, and of the Game Mode edition of VibeLight
+- Added the latency mode of the stream to the detailed statistics overlay
 
 ### Changed
 - Renamed the app to VibeLight with a new logo and its own package, so it installs next to Moonlight
+- Renamed the ForceGM variant to VibeLight-GameMode, which leaves the latency mode to Auto
 - Redesigned the interface with a new theme, cards that keep their shape when focused, and a loading screen with the box art of the app
 - Showed the chosen settings and how to cancel on the loading screen of a stream
 - Checked for updates on the VibeLight repository and pointed the support QR code to its guide
@@ -30,6 +36,9 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Polled the gamepads every 16 ms and sent each controller state once instead of repeating unchanged states
 
 ### Fixed
+- Fixed Game Mode freezing the video on the first frame or leaving it black on Tizen 9 TVs
+- Fixed Game Mode staying enabled on Tizen 5.5 when a stored setting enabled it
+- Fixed warning dialogs logging errors when closed
 - Fixed crashes and hangs when a stream ended while the video pipeline was being torn down or restarted
 - Fixed a new stream starting while the previous one was still shutting down
 - Fixed the modifier keys staying pressed on the host after a stream ended
