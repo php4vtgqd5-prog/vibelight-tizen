@@ -442,6 +442,10 @@ const Views = {
           // Navigate to the HostsMenuHighlight view to highlight the host's menu icon
           Navigation.change(Views.HostsMenuHighlight);
           focusElement(Views.HostsMenuHighlight.view.current());
+        } else if (ContinuePlaying.isVisible()) {
+          // Go up to the Continue playing banner above the hosts
+          Navigation.change(Views.ContinueBanner);
+          focusElement(Views.ContinueBanner.view.current());
         } else {
           // Set focus on the first navigation item in HostsNav view when transitioning from Add Host container
           Navigation.change(Views.HostsNav);
@@ -523,6 +527,12 @@ const Views = {
     }),
     up: function() {},
     down: function() {
+      if (ContinuePlaying.isVisible()) {
+        // Go down to the Continue playing banner above the hosts
+        Navigation.change(Views.ContinueBanner);
+        focusElement(Views.ContinueBanner.view.current());
+        return;
+      }
       // Navigate to the Hosts view
       Navigation.change(Views.Hosts);
       // Set focus on the first navigation item in Hosts view when transitioning from HostsNav view
@@ -567,6 +577,12 @@ const Views = {
       return [];
     }),
     up: function() {
+      if (ContinuePlaying.isVisible()) {
+        // Go up to the Continue playing banner above the hosts
+        Navigation.change(Views.ContinueBanner);
+        focusElement(Views.ContinueBanner.view.current());
+        return;
+      }
       // Navigate to the HostsNav view (Settings button)
       Navigation.change(Views.HostsNav);
       focusElement(Views.HostsNav.view.current());
@@ -594,6 +610,46 @@ const Views = {
       focusElement(Views.Hosts.view.current());
     },
     press: function() {},
+    switch: function() {
+      focusElement(this.view.current());
+    },
+    enter: function() {
+      mark(this.view.current());
+    },
+    leave: function() {
+      unmark(this.view.current());
+    },
+  },
+  ContinueBanner: {
+    view: new ListView(() => ['continue-banner']),
+    up: function() {
+      ContinuePlaying.cancelCountdown();
+      Navigation.change(Views.HostsNav);
+      focusElement(Views.HostsNav.view.current());
+    },
+    down: function() {
+      ContinuePlaying.cancelCountdown();
+      Navigation.change(Views.Hosts);
+      Views.Hosts.switch();
+    },
+    left: function() {
+      ContinuePlaying.cancelCountdown();
+    },
+    right: function() {
+      ContinuePlaying.cancelCountdown();
+    },
+    accept: function() {
+      ContinuePlaying.start();
+    },
+    back: function() {
+      // The first BACK only stops the automatic start of the last app
+      if (!ContinuePlaying.cancelCountdown()) {
+        exitAppDialog();
+      }
+    },
+    press: function() {
+      ContinuePlaying.cancelCountdown();
+    },
     switch: function() {
       focusElement(this.view.current());
     },
@@ -1197,6 +1253,7 @@ const Views = {
     view: new ListView(() => [
       'sortAppsListBtn',
       'optimizeGamesBtn',
+      'autoResumeBtn',
       'removeAllHostsBtn'
     ]),
     up: function() {
@@ -2147,6 +2204,7 @@ const Navigation = (function() {
     push: Stack.push,
     change: Stack.change,
     pop: Stack.pop,
+    current: Stack.get,
     start: State.start,
     stop: State.stop,
   };

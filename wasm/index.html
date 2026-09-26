@@ -53,6 +53,21 @@
       </div>
     </header>
     <main id="main-content" class="mdl-layout__content">
+      <!-- Last app streamed, shown above the hosts -->
+      <div id="continue-banner" role="link" tabindex="0" aria-label="Continue playing" style="display: none;">
+        <div id="continueArt" class="continue-art"></div>
+        <div class="continue-info">
+          <div class="continue-label"><i class="material-icons">history</i><span data-i18n="Continue playing">Continue playing</span></div>
+          <div id="continueTitle" class="continue-title"></div>
+          <div id="continueSubtitle" class="continue-subtitle"></div>
+          <div class="continue-countdown">
+            <div class="continue-countdown-track"><div id="continueCountdownBar" class="continue-countdown-bar"></div></div>
+            <span id="continueCountdownText"></span>
+            <span class="continue-countdown-hint" data-i18n="Press BACK to cancel">Press BACK to cancel</span>
+          </div>
+        </div>
+        <div class="continue-play"><i class="material-icons">play_arrow</i><span data-i18n="Play">Play</span></div>
+      </div>
       <div id="host-grid">
         <div id="addHostContainer" class="host-add-container mdl-card mdl-shadow--4dp" role="link" tabindex="0" aria-label="Add Host">
           <div id="host-add" class="mdl-card__title mdl-card--expand">
@@ -312,6 +327,22 @@
                   <input type="checkbox" id="optimizeGamesSwitch" class="mdl-switch__input">
                   <span class="mdl-switch__label" data-i18n="Allow the host to modify game settings for optimal streaming">
                     Allow the host to modify game settings for optimal streaming
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div class="setting-option">
+              <label><span data-i18n="Resume on launch">Resume on launch</span>
+                <span class="badge badge-new" data-i18n="New">New</span>
+              </label>
+              <span class="mdl-list__item-text-body" data-i18n="When VibeLight opens, starts the last app you played after a short countdown. Press BACK during the countdown to stay on the home screen.">
+                When VibeLight opens, starts the last app you played after a short countdown. Press BACK during the countdown to stay on the home screen.
+              </span>
+              <div id="autoResumeMenu">
+                <label id="autoResumeBtn" class="mdl-switch mdl-js-switch mdl-js-ripple-effect setting-control" for="autoResumeSwitch">
+                  <input type="checkbox" id="autoResumeSwitch" class="mdl-switch__input">
+                  <span class="mdl-switch__label" data-i18n="Start the last played app automatically">
+                    Start the last played app automatically
                   </span>
                 </label>
               </div>
@@ -708,6 +739,7 @@
   <script type="text/javascript" src="platform/stats.js"></script>
   <script type="text/javascript" src="platform/autotune-core.js"></script>
   <script type="text/javascript" src="platform/autotune.js"></script>
+  <script type="text/javascript" src="platform/continue.js"></script>
   <script type="text/javascript" src="platform/index.js"></script>
   <script type="text/javascript" src="platform/navigation.js"></script>
   <script type="text/javascript" src="platform/remote_controller.js"></script>

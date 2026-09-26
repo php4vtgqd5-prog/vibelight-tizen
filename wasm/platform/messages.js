@@ -359,6 +359,9 @@ function handleMessage(msg) {
     cycleStatsOverlayMode();
   } else if (msg === 'Connection Established') {
     StreamSessionStats.connected();
+    // Offer this app on the home screen next time
+    var statsSession = StreamSessionStats.current();
+    ContinuePlaying.remember(statsSession ? statsSession.meta : null);
     // Prepare the screen for video stream
     hideStreamLoading();
     $('body').addClass('vl-streaming');

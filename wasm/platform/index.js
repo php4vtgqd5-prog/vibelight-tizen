@@ -31,6 +31,7 @@ var hosts = {}; // Hosts is an associative array of NvHTTP objects, keyed by ser
 var isHostOpening = false; // Prevents concurrent hostChosen executions, initial value is false
 var isHostsLoaded = false; // Indicates if IndexedDB has finished loading hosts
 var isSubnetScanFinished = false; // Indicates if the initial subnet scan has completed
+var deepLinkRequested = false; // Indicates if the app was launched to open a host or an app from Smart Hub
 var activePolls = {}; // Hosts currently being polled. An associated array of polling IDs, keyed by server UID
 var pairingCert; // Loads the generated certificate
 var myUniqueid;
@@ -116,6 +117,8 @@ function updateHeaderStatus() {
     icon = 'lan';
   }
   $('#header-network-icon').text(icon).toggleClass('is-offline', offline);
+  // Refresh how long ago the last app was played
+  ContinuePlaying.render();
 }
 
 function startHeaderStatus() {
@@ -200,6 +203,7 @@ function attachListeners() {
   $('#sessionSummarySwitch').on('click', saveSessionSummary);
   $('#sessionHistoryBtn').on('click', sessionHistoryDialog);
   attachAutoTuneListeners();
+  attachContinueListeners();
   $('#navigationGuideBtn').on('click', navigationGuideDialog);
   $('#checkUpdatesBtn').on('click', checkForAppUpdates);
   $('#restartAppBtn').on('click', restartAppDialog);
@@ -361,6 +365,8 @@ function updateHostStatusIndicator(host) {
   if (label) {
     label.textContent = hostStatusLabel(status);
   }
+  // The Continue playing banner shows whether its host is online
+  ContinuePlaying.render();
 }
 
 function hostStatusLabel(status) {
@@ -512,6 +518,7 @@ function showHostsMode() {
   $('#performance-stats').css('display', 'none');
   $('#main-content').removeClass('fullscreen');
   $('#listener').removeClass('fullscreen');
+  ContinuePlaying.render();
 
   Navigation.start();
   Navigation.pop();
@@ -567,7 +574,11 @@ function restoreUiAfterWasmLoad() {
   Navigation.push(Views.Hosts);
   showHostsMode();
   // Set focus to current item and/or scroll to the current host row
-  setTimeout(() => Navigation.switch(), 100);
+  setTimeout(() => {
+    Navigation.switch();
+    // Offer the last app played, or start it when Resume on launch is enabled
+    ContinuePlaying.onUiReady();
+  }, 100);
 
   // Find mDNS host discovered using ServiceFinder (network service discovery)
   // findNvService(function(finder, opt_error) {
@@ -1728,7 +1739,7 @@ function showSettingsMode() {
   $('#goBackBtn').show();
   $('#restoreDefaultsBtn').show();
   $('#main-content').children().not('#listener, #loadingSpinner, #wasmSpinner').show();
-  $('#host-grid').hide();
+  $('#host-grid, #continue-banner').hide();
   $('#game-grid').hide();
   $('.nav-menu-parent').hide();
   $('#updateAppBtn').hide();
@@ -1752,7 +1763,7 @@ function showSettings() {
   // Hide the main header and content before showing a loading screen
   $('#main-header').children().hide();
   $('#main-header').addClass('vl-header-bare');
-  $('#host-grid, #game-grid').hide();
+  $('#host-grid, #continue-banner, #game-grid').hide();
 
   // Show a spinner while the setting list loads
   $('#wasmSpinner').css('display', 'inline-block');
@@ -2462,7 +2473,7 @@ function showAppsMode() {
   $('#goBackBtn').show();
   $('#quitRunningAppBtn').show();
   $('#main-content').children().not('#listener, #loadingSpinner, #wasmSpinner').show();
-  $('#host-grid').hide();
+  $('#host-grid, #continue-banner').hide();
   $('#settings-list').hide();
   $('.nav-menu-parent').hide();
   $('#updateAppBtn').hide();
@@ -2505,7 +2516,7 @@ function showApps(host) {
     // Hide the main header before showing a loading screen
     $('#main-header').children().hide();
     $('#main-header').addClass('vl-header-bare');
-    $('#host-grid, #settings-list').hide();
+    $('#host-grid, #continue-banner, #settings-list').hide();
 
     // Show a spinner while the app list loads
     $('#wasmSpinner').css('display', 'inline-block');
@@ -4050,6 +4061,7 @@ function restoreDefaultsSettingsValues() {
 
   restoreStatisticsDefaults();
   restoreAutoTuneDefaults();
+  restoreContinueDefaults();
 }
 
 function initSamsungKeys() {
@@ -4405,6 +4417,9 @@ function loadUserDataCb() {
 
   console.log('%c[index.js, loadUserDataCb]', 'color: green;', 'Load stored Auto-Tune preferences.');
   loadAutoTuneSettings();
+
+  console.log('%c[index.js, loadUserDataCb]', 'color: green;', 'Load stored Resume on launch preference.');
+  loadContinueSettings();
 }
 
 function loadHTTPCerts() {
@@ -4469,6 +4484,7 @@ function loadHTTPCertsCb() {
           addHostToGrid(revivedHost);
         }
         isHostsLoaded = true;
+        ContinuePlaying.onHostsLoaded();
         // Load stored preview app lists and update Smart Hub Preview tiles.
         // Using the persisted list avoids requiring live host connections at startup.
         getData('previewApps', function(storedPreview) {
@@ -4657,6 +4673,11 @@ function handleDeepLink() {
         var actionData = JSON.parse(payload.values);
         console.log('%c[index.js, handleDeepLink]', 'color: green;', 'Deep link action data: ', actionData);
 
+        if (actionData.serverUid) {
+          // A deep link replaces the automatic start of the last app
+          deepLinkRequested = true;
+          ContinuePlaying.cancelCountdown();
+        }
         if (actionData.serverUid && actionData.appId !== null && actionData.appId !== undefined) {
           // App-level deep link from a preview tile: navigate to the specific host and app
           waitForHostAndNavigateToApp(actionData.serverUid, actionData.appId);
