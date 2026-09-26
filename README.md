@@ -143,8 +143,9 @@ inside Docker: `docker build -t vibelight .` produces `/home/moonlight/VibeLight
 GitHub Actions run the checks, the UI tests and a build of the widget for every push
 ([ci.yml](.github/workflows/ci.yml)). To publish a version, update the version in `res/config.xml`
 and `package.json`, add its section to [CHANGELOG.md](CHANGELOG.md), then push a tag such as
-`v2.0.0`: [release.yml](.github/workflows/release.yml) builds both widgets and publishes the release
-with its notes.
+`v2.0.0`: [release.yml](.github/workflows/release.yml) runs the checks again, builds both widgets and
+publishes the release with its notes. A tag with a suffix, such as `v2.0.0-beta.1`, publishes a
+pre-release for testing, which the update check of the app does not offer.
 
 Translations live in `wasm/static/locales`; `npm run i18n:sync` adds new strings to every locale,
 see [CONTRIBUTING](.github/CONTRIBUTING.md).
