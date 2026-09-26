@@ -1,6 +1,48 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file. VibeLight continues Moonlight
+Tizen from its version 1.17.1, whose history is kept below.
+
+## v2.0.0
+
+### Added
+- Added Auto-Tune, which chooses the resolution, frame rate, bitrate and codec of every stream from the TV, the host and the network
+- Added a Test my setup dialog showing the TV capabilities, the latency to each host and the recommended settings
+- Added learning of the bitrate each host sustains from the statistics of the sessions
+- Added an adaptive reconnect that restarts a struggling stream at a lower bitrate, at most twice per session
+- Added an automatic fallback to another codec when the TV cannot open the decoder of the chosen one
+- Added a statistics overlay with compact, standard and detailed modes, switched with the YELLOW key
+- Added a session summary with a quality score after each stream, and a history of the last sessions
+- Added a Continue playing banner on the home screen that starts the last app streamed with one press
+- Added Resume on launch, which starts the last app when VibeLight opens after a cancelable countdown
+- Added a Polish translation and completed the Brazilian Portuguese translation
+- Added the RED key to cancel a stream that is still starting or restarting
+- Added a clock and the connection type to the header, and the online, offline or not paired state to the host cards
+- Added a development harness that runs the interface in a desktop browser with a simulated TV and host
+- Added continuous integration with lint, unit tests, UI tests, a syntax check of the WebAssembly module and a widget build
+
+### Changed
+- Renamed the app to VibeLight with a new logo and its own package, so it installs next to Moonlight
+- Redesigned the interface with a new theme, cards that keep their shape when focused, and a loading screen with the box art of the app
+- Showed the chosen settings and how to cancel on the loading screen of a stream
+- Checked for updates on the VibeLight repository and pointed the support QR code to its guide
+- Replaced the busy-waiting frame pacer with sleeps that realign on late frames, lowering the CPU load while streaming
+- Polled the gamepads every 16 ms and sent each controller state once instead of repeating unchanged states
+
+### Fixed
+- Fixed crashes and hangs when a stream ended while the video pipeline was being torn down or restarted
+- Fixed a new stream starting while the previous one was still shutting down
+- Fixed the modifier keys staying pressed on the host after a stream ended
+- Fixed a use-after-free of the messages posted from the streaming threads to the interface
+- Fixed crashes on malformed numbers and certificates received from the host
+- Fixed the Opus decoder leaking at the end of every stream
+- Fixed audio setup failing on some TVs without a stereo channel layout, and reported a missing decoder instead of a generic error
+- Fixed the mouse emulation of gamepads repeating clicks and sending moves without movement
+- Fixed host names and app titles with HTML characters breaking the dialogs
+- Fixed the Wake-on-LAN dialog hiding the reason of a failure and accepting an empty MAC address
+- Fixed the mute key of the remote muting only once
+- Fixed the header title reverting to the app name after a change of language
+- Fixed dialogs stretching to the height of the screen on newer TVs
 
 ## v1.17.1
 

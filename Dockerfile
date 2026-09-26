@@ -95,12 +95,12 @@ COPY --chown=moonlight wasm/static/ ./moonlight-tizen/wasm/static/
 RUN cmake --install build --prefix build
 RUN cp moonlight-tizen/res/icon.png build/widget/
 
-# Inject Game Mode metadata into the Tizen config.xml file, which is required for building the ForceGM variant later
+# Inject the Game Mode metadata into the Tizen config.xml file of the Game Mode variant
 ARG FORCE_GAME_MODE=false
 RUN if [ "$FORCE_GAME_MODE" = "true" ]; then \
 		sed -i 's|<tizen:metadata key="http://samsung.com/tv/metadata/use.voiceguide"|<tizen:metadata key="http://samsung.com/tv/metadata/use.game.mode" value="true"/>\n    <tizen:metadata key="http://samsung.com/tv/metadata/use.voiceguide"|' build/widget/config.xml && \
 		grep -q 'use.game.mode' build/widget/config.xml && \
-		echo "Game Mode metadata injected into config.xml (ForceGM variant)"; \
+		echo "Game Mode metadata injected into config.xml (Game Mode variant)"; \
 	else \
 		echo "No Game Mode metadata injected into config.xml (Standard variant)"; \
 	fi
@@ -116,8 +116,8 @@ RUN echo \
 	'expect eof\n' \
 | expect
 
-# Rename the output WGT file by appending a suffix for the ForceGM variant, or leave without a suffix for the Standard variant
-RUN if [ "$FORCE_GAME_MODE" = "true" ]; then SUFFIX="-ForceGM"; else SUFFIX=""; fi; \
+# Rename the output WGT file by appending a suffix for the Game Mode variant, or leave without a suffix for the Standard variant
+RUN if [ "$FORCE_GAME_MODE" = "true" ]; then SUFFIX="-GameMode"; else SUFFIX=""; fi; \
 	mv build/widget/VibeLight.wgt "VibeLight${SUFFIX}.wgt" && ls -la *.wgt
 
 # Clean up unnecessary files to reduce image size

@@ -1,0 +1,71 @@
+# Builds the widgets of a version and publishes them as a GitHub release. Push a tag named after the
+# version of res/config.xml (for example v2.0.0) after adding its section to CHANGELOG.md.
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Publish as a pre-release
+        type: boolean
+        default: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Read the version
+        run: |
+          VERSION=$(grep -oP 'version="\K[0-9]+\.[0-9]+\.[0-9]+' res/config.xml)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "The tag ${GITHUB_REF_NAME} does not match the version ${VERSION} of res/config.xml" >&2
+            exit 1
+          fi
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Write the release notes from CHANGELOG.md
+        run: node tools/ci/release-notes.mjs "$VERSION" > release-notes.md
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build the standard widget
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: vibelight:standard
+          build-args: FORCE_GAME_MODE=false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build the Game Mode widget
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: vibelight:gamemode
+          build-args: FORCE_GAME_MODE=true
+          cache-from: type=gha
+      - name: Extract the widgets
+        run: |
+          docker create --name standard vibelight:standard
+          docker cp standard:/home/moonlight/VibeLight.wgt .
+          docker rm standard
+          docker create --name gamemode vibelight:gamemode
+          docker cp gamemode:/home/moonlight/VibeLight-GameMode.wgt .
+          docker rm gamemode
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: VibeLight v${{ env.VERSION }}
+          body_path: release-notes.md
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
+          files: |
+            VibeLight.wgt
+            VibeLight-GameMode.wgt

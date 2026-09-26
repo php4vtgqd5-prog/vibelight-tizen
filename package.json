@@ -1,0 +1,30 @@
+{
+  "name": "vibelight-tizen",
+  "version": "2.0.0",
+  "private": true,
+  "description": "VibeLight: a game streaming client for Samsung Tizen TVs, based on Moonlight",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/php4vtgqd5-prog/vibelight-tizen.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "harness": "node tools/dev-harness/server.mjs --port 8080",
+    "lint": "eslint .",
+    "test": "npm run test:unit && npm run test:ui",
+    "test:unit": "node --test tests/unit/*.test.js tests/unit/*.test.mjs",
+    "test:ui": "playwright test",
+    "i18n:sync": "node wasm/static/js/i18n-sync.js",
+    "i18n:check": "node wasm/static/js/i18n-sync.js && git diff --exit-code -- wasm/static/locales",
+    "check:wasm": "bash tools/ci/check-wasm-syntax.sh",
+    "check": "npm run lint && npm run test:unit && npm run i18n:check && npm run check:wasm"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0"
+  }
+}

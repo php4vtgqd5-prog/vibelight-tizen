@@ -5,3 +5,8 @@ Dockerfile
 **/.DS_Store
 build/
 .vscode/
+# Node.js tooling, not part of the widget
+node_modules/
+test-results/
+playwright-report/
+tests/

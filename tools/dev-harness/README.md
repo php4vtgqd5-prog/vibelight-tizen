@@ -31,5 +31,12 @@ The page accepts options in its query string, for example
 | `capacity` | `80` | Throughput of the simulated network (Mbps), frames are lost above it |
 | `loss` | `0` | Random frame loss of the simulated network (%) |
 | `renderLimit` | `0` | Highest frame rate the simulated TV decoder renders (0 for no limit) |
+| `freeze` | `0` | `1` simulates a video pipeline that stops after the first frame |
+| `running` | none | Id of an app that already runs on the host, e.g. `20002` |
+| `locale` | `en-US` | Language of the TV, e.g. `pl-PL` or `pt-BR` |
+| `version` | `2.0.0` | Version of the installed app |
+
+The simulated network can also change while a stream runs, from the console or a test:
+`__harness.network.capacity = 10` makes it carry 10 Mbps from the next second on.
 
 The automated UI tests (`npm run test:ui`) drive the same harness with Playwright.

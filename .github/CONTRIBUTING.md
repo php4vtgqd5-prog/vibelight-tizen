@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to the Moonlight project! Whether you're opening an issue or proposing a pull request, your help is greatly appreciated.
+Thanks for contributing to VibeLight! Whether you're opening an issue or proposing a pull request, your help is greatly appreciated.
 
 ## General Guidelines
 
@@ -35,7 +35,7 @@ This helps make reviews easier and ensures contributions align with the project'
 
 Before opening a pull request, make sure you can build and test your changes successfully:
 
-- Please follow the [development guide](https://github.com/brightcraft/moonlight-tizen/wiki/Development-Guide) available in the Wiki. This guide explains how to properly build Moonlight locally and run it on your device.
+- Please follow the [development section](https://github.com/php4vtgqd5-prog/vibelight-tizen#development) of the README, which explains how to build VibeLight, run it in a desktop browser with the development harness and run the checks (`npm run check` and `npm run test:ui`).
 - **Test your changes** on the target Tizen device whenever possible to ensure they work correctly in the real environment.
 - When making changes to platform-specific functionality, ensure that your changes do not introduce **regressions or affect existing Tizen behavior**.
 
@@ -67,7 +67,7 @@ Large PRs can be harder to review and may require more time. Smaller and focused
 
 ## Localization
 
-Moonlight includes built-in localization support, and contributions for new or improved translations are always welcome.
+VibeLight includes built-in localization support, and contributions for new or improved translations are always welcome.
 
 ### Adding a New Language
 

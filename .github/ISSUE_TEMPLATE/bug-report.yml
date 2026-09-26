@@ -10,15 +10,15 @@ body:
         Please provide information about the device you are using as a client.
   - type: input
     attributes:
-      label: Moonlight Version
-      description: What is the version of Moonlight you are using?
+      label: VibeLight Version
+      description: What is the version of VibeLight you are using?
       placeholder: "Example: 1.10.0"
     validations:
       required: true
   - type: dropdown
     attributes:
       label: Installation Type
-      description: What is the method you used to install Moonlight on your device?
+      description: What is the method you used to install VibeLight on your device?
       options:
         - Apps2Samsung
         - Tizen Studio
@@ -97,7 +97,7 @@ body:
     attributes:
       label: Log Files
       description: Provide any relevant logs to help us diagnose the issue.
-      placeholder: "Drag and drop the Moonlight and/or Sunshine log files here or click to upload."
+      placeholder: "Drag and drop the VibeLight and/or Sunshine log files here or click to upload."
   - type: textarea
     attributes:
       label: Screenshots

@@ -1,0 +1,93 @@
+# Checks every change of VibeLight: lint, unit tests, locale files, UI tests in Chromium and a syntax
+# check of the WebAssembly module. Pushes also build the widget with the Tizen SDK in Docker and
+# publish it as an artifact of the run, for testing on a TV.
+name: CI
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  web:
+    name: Lint, unit and UI tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (the widget must stay ES2017 for Tizen 5.5)
+        run: npm run lint
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Locale files are in sync with the sources
+        run: npm run i18n:check
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: UI tests
+        run: npm run test:ui
+      - name: Upload the report of the UI tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+  wasm:
+    name: WebAssembly syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install Clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Check the sources against the platform API stubs
+        run: bash tools/ci/check-wasm-syntax.sh
+  widget:
+    name: Build the widget
+    needs: [web, wasm]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      # Development builds show their commit in Settings > About
+      - name: Inject build metadata
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          sed -i "s/__BUILD_TYPE__/development/g" wasm/platform/index.js
+          sed -i "s/__BUILD_COMMIT__/$(git rev-parse --short HEAD)/g" wasm/platform/index.js
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build the widget with the Tizen SDK
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: vibelight:ci
+          build-args: FORCE_GAME_MODE=false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Extract the widget
+        run: |
+          docker create --name widget vibelight:ci
+          docker cp widget:/home/moonlight/VibeLight.wgt "VibeLight-${SHORT_SHA}.wgt"
+          docker rm widget
+      - name: Upload the widget
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeLight-${{ env.SHORT_SHA }}
+          path: VibeLight-${{ env.SHORT_SHA }}.wgt
+          retention-days: 30
