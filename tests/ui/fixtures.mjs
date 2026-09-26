@@ -17,15 +17,21 @@ export const test = base.extend({
 
   app: async ({ page, harness }, use) => {
     const errors = [];
+    const expectedErrors = [...EXPECTED_CONSOLE_ERRORS];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
-      if (message.type() === 'error' && !EXPECTED_CONSOLE_ERRORS.some((pattern) => pattern.test(message.text()))) {
+      if (message.type() === 'error' && !expectedErrors.some((pattern) => pattern.test(message.text()))) {
         errors.push(message.text());
       }
     });
 
     const app = {
       page,
+
+      // Accept an error the widget logs on purpose in this test, such as a failed pairing
+      allowError(pattern) {
+        expectedErrors.push(pattern);
+      },
 
       // Open the widget and wait for the saved hosts. Short streams in Game Mode lead to a question
       // about a frozen video once per TV, which only the tests of that question keep.

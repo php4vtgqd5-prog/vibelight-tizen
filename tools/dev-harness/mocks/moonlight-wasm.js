@@ -9,6 +9,8 @@
 //   ?scenario=paired   Start with the fake host already paired (default), or `fresh` for no hosts
 //   &hostCodecs=h264,hevc,hevc10,av1,av110   Codecs the host can encode
 //   &rtt=3&jitter=1    Round-trip time and jitter of the simulated network, in milliseconds
+//   &hostWork=0        Time the host spends gathering its /serverinfo answer, in milliseconds, as
+//                      Sunshine on Windows does when it looks up the MAC address of its adapter
 //   &capacity=80       Throughput of the simulated network in Mbps, frames are lost above it
 //   &loss=0            Random frame loss of the simulated network, in percent
 //   &renderLimit=0     Highest frame rate the simulated TV decoder renders, 0 for no limit
@@ -16,6 +18,8 @@
 //                      latency mode of Game Mode: the player then rejects the frames
 //   &ultraLow=1        0 simulates a WASM player that reports no Ultra Low latency mode
 //   &running=20002     Id of an app that already runs on the host
+//   &pinDelay=1500     Time the user takes to type the PIN on the host while pairing, in ms
+//   &pairAccepted=1    0 simulates a host that refuses the pairing, as after a wrong PIN
 //
 // Nothing here is shipped with the widget.
 (function(global) {
@@ -37,6 +41,7 @@
     jitter: numberParam('jitter', 1),
     capacity: numberParam('capacity', 80),
     loss: numberParam('loss', 0),
+    hostWork: numberParam('hostWork', 0),
   };
 
   var fakeHost = {
@@ -285,6 +290,9 @@
 
   // Module API -------------------------------------------------------------------------------------
 
+  var pendingPair = null;
+  var pendingPairCallback = null;
+
   var resolved = function(value) {
     return { type: 'resolve', ret: value === undefined ? null : value };
   };
@@ -321,7 +329,9 @@
         fakeHost.currentGame = 0;
         answer(callbackId, 'resolve', '<root status_code="200"><cancel>1</cancel></root>', 300);
       } else if (path.indexOf('/pair') === 0) {
-        answer(callbackId, 'resolve', '<root status_code="200"><paired>1</paired></root>');
+        var accepted = numberParam('pairAccepted', 1) !== 0;
+        fakeHost.paired = accepted;
+        answer(callbackId, 'resolve', '<root status_code="200"><paired>' + (accepted ? 1 : 0) + '</paired></root>');
       } else {
         answer(callbackId, 'reject', '-1');
       }
@@ -331,15 +341,23 @@
     },
     pair: function(callbackId) {
       // Pretend the user typed the PIN on the host after a moment
-      later(1500, function() {
+      pendingPair = setTimeout(function() {
+        pendingPair = null;
         fakeHost.paired = true;
         global.handlePromiseMessage(callbackId, 'resolve', 'HARNESS-PINNED-PUBLIC-KEY');
-      });
+      }, numberParam('pinDelay', 1500));
+      pendingPairCallback = callbackId;
     },
     wakeOnLan: function(callbackId, macAddress) {
       answer(callbackId, 'resolve', 'Magic packet sent successfully to MAC address: ' + macAddress, 20);
     },
+    // Aborts the HTTP request of a pairing in progress, which then fails like in the WASM module
     cancelRequest: function() {
+      if (pendingPair) {
+        clearTimeout(pendingPair);
+        pendingPair = null;
+        answer(pendingPairCallback, 'reject', '-1', 5);
+      }
       return resolved();
     },
     startStream: function(host, httpPort, width, height, fps, bitrate) {
@@ -381,9 +399,13 @@
     var url = typeof resource === 'string' ? resource : resource.url;
     if (/^https?:\/\//.test(url) && url.indexOf(global.location.host) === -1) {
       if (isFakeHost(url)) {
+        // Like Sunshine, the host gathers its state for /serverinfo, and answers other paths at once
+        var serverInfo = /^https?:\/\/[^\/]+\/serverinfo/.test(url);
         return new Promise(function(resolve) {
-          later(networkDelay(), function() {
-            resolve(new Response(serverInfoXml(), { status: 200, headers: { 'Content-Type': 'application/xml' } }));
+          later(networkDelay() + (serverInfo ? network.hostWork : 0), function() {
+            resolve(serverInfo
+              ? new Response(serverInfoXml(), { status: 200, headers: { 'Content-Type': 'application/xml' } })
+              : new Response('<root status_code="404"></root>', { status: 404, headers: { 'Content-Type': 'application/xml' } }));
           });
         });
       }

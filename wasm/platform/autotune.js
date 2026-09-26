@@ -14,6 +14,13 @@ var AUTOTUNE_PROBE_CACHE_MS = 3 * 60 * 1000;
 var AUTOTUNE_PROBE_REQUESTS = 7;
 var AUTOTUNE_PROBE_TIMEOUT_MS = 800;
 var AUTOTUNE_PROBE_BUDGET_MS = 2000;
+// Path the probes request from the HTTP server of the host, which it answers at once with a 404.
+// Its /serverinfo also gathers the state of the host, such as the MAC address of its network
+// adapter, which takes Sunshine on Windows up to about a hundred milliseconds: measured on it, a
+// network with a round trip of a few milliseconds looked slow and got the bitrate of a weak one.
+var AUTOTUNE_PROBE_PATH = '/vibelight-probe';
+// Path requested instead by hosts that do not answer the probe path
+var AUTOTUNE_PROBE_FALLBACK_PATH = '/serverinfo';
 
 var AutoTune = (function() {
   var profiles = {};
@@ -117,7 +124,8 @@ var AutoTune = (function() {
     if (cached && Date.now() - cached.at < AUTOTUNE_PROBE_CACHE_MS) {
       return Promise.resolve(cached.probe);
     }
-    var url = 'http://' + formatAddressForUrl(host.address) + ':' + (host.httpPort || 47989) + '/serverinfo';
+    var base = 'http://' + formatAddressForUrl(host.address) + ':' + (host.httpPort || 47989);
+    var url = base + AUTOTUNE_PROBE_PATH;
     var times = [];
     var failures = 0;
     var startedAt = Date.now();
@@ -137,6 +145,12 @@ var AutoTune = (function() {
         .then(function() {
           times.push(now() - begin);
         }, function() {
+          if (times.length === 0 && url !== base + AUTOTUNE_PROBE_FALLBACK_PATH) {
+            // A host that does not answer the probe path is measured with the slower /serverinfo,
+            // and this request tells nothing about the network
+            url = base + AUTOTUNE_PROBE_FALLBACK_PATH;
+            return;
+          }
           failures++;
         })
         .then(function() {

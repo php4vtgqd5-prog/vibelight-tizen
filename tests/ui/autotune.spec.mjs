@@ -52,3 +52,16 @@ test('the RED key during an adaptive restart returns to the Apps view', async ({
   await page.waitForTimeout(3000);
   expect(await page.evaluate(() => isStreamSessionActive)).toBe(false);
 });
+
+// Sunshine on Windows gathers its state for /serverinfo, which takes up to about a hundred
+// milliseconds, so the latency is measured on a path the host answers at once
+test('Auto-Tune measures the network, not the time the host spends on /serverinfo', async ({ app, page }) => {
+  await app.open('?network=wifi&signal=0.9&rtt=3&jitter=1&hostWork=110');
+  await page.evaluate(() => autoTuneDialog());
+  const latency = page.locator('#autoTuneDialog .autotune-row', { hasText: 'Latency to the host' }).locator('.autotune-value');
+  await expect(latency).toHaveText(/^[\d.]+ ms ± [\d.]+ ms$/);
+  const [, median] = (await latency.textContent()).match(/^([\d.]+) ms/);
+  expect(Number(median)).toBeLessThan(20);
+  await expect(page.locator('#autoTuneDialog .autotune-reasons')).toContainText('Network quality: Good');
+  await expect(page.locator('#autoTuneDialog .autotune-recommendation')).toHaveText(/^3840×2160 · 60 FPS · HEVC/);
+});
