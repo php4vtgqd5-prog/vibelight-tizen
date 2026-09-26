@@ -1,3 +1,5 @@
+<p align="center"><img src="res/icon.png" width="128" alt="VibeLight icon"></p>
+
 # VibeLight
 
 [![CI](https://img.shields.io/github/actions/workflow/status/php4vtgqd5-prog/vibelight-tizen/ci.yml?style=for-the-badge&logo=github&label=CI)](https://github.com/php4vtgqd5-prog/vibelight-tizen/actions/workflows/ci.yml)
@@ -27,11 +29,33 @@ settings, stream statistics, a one-press way back into your last game and a rede
 - **Continue playing.** The home screen offers the last app you streamed: press OK and VibeLight
   wakes the host if needed and starts the app. With *Resume on launch* it starts by itself after a
   short countdown, which BACK cancels.
-- **A new interface.** A dark theme with clear focus, host cards showing whether a host is online,
-  a loading screen with the box art of the app and the chosen settings, a clock in the header, and a
-  Polish translation next to English and Brazilian Portuguese.
+- **A modern interface.** A dark theme with the Inter typeface and a new icon, a greeting with the
+  PCs online on the home screen, an app list over the colors of the focused game, animated cards with
+  clear focus, a loading screen with the box art of the app and the chosen settings, a clock in the
+  header, and a Polish translation next to English and Brazilian Portuguese.
 - **Stability.** Many fixes in the streaming core: teardown races, leaks, a busy-waiting frame
   pacer, gamepad input, and more (see the [changelog](CHANGELOG.md)).
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/en/home.jpg" alt="Home screen with the PCs online and Continue playing"><br><sub>Home screen with the PCs online and Continue playing</sub></td>
+    <td width="50%"><img src="docs/screenshots/en/apps.jpg" alt="Apps of a PC over the colors of the focused game"><br><sub>Apps of a PC over the colors of the focused game</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/en/stream-statistics.jpg" alt="Detailed statistics overlay, switched with the YELLOW key"><br><sub>Detailed statistics overlay, switched with the YELLOW key</sub></td>
+    <td width="50%"><img src="docs/screenshots/en/session-summary.jpg" alt="Quality score and summary after a session"><br><sub>Quality score and summary after a session</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/en/auto-tune.jpg" alt="Auto-Tune settings"><br><sub>Auto-Tune settings</sub></td>
+    <td width="50%"><img src="docs/screenshots/en/auto-tune-test.jpg" alt="Test my setup: the TV, the latency and the recommended settings"><br><sub>Test my setup: the TV, the latency and the recommended settings</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/en/loading.jpg" alt="Loading screen while Auto-Tune checks the connection"><br><sub>Loading screen while Auto-Tune checks the connection</sub></td>
+    <td width="50%"><img src="docs/screenshots/en/game-mode.jpg" alt="Game Mode, which Auto uses only where it works"><br><sub>Game Mode, which Auto uses only where it works</sub></td>
+  </tr>
+</table>
 
 ## Requirements
 
@@ -109,6 +133,7 @@ npm run harness      # http://localhost:8080/
 npm run check        # lint (ES2017 for Tizen 5.5), unit tests, locale files, WebAssembly syntax check
 npx playwright install chromium
 npm run test:ui      # UI tests in Chromium against the harness
+npm run screenshots  # screenshots of this page, saved to docs/screenshots
 ```
 
 The WebAssembly module and the widget are built with the Tizen SDK and the Samsung Emscripten SDK

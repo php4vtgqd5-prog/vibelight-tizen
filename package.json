@@ -17,6 +17,7 @@
     "test": "npm run test:unit && npm run test:ui",
     "test:unit": "node --test tests/unit/*.test.js tests/unit/*.test.mjs",
     "test:ui": "playwright test",
+    "screenshots": "node tools/screenshots.mjs",
     "i18n:sync": "node wasm/static/js/i18n-sync.js",
     "i18n:check": "node wasm/static/js/i18n-sync.js && git diff --exit-code -- wasm/static/locales",
     "check:wasm": "bash tools/ci/check-wasm-syntax.sh",

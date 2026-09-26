@@ -96,7 +96,7 @@ export default [
   },
   {
     // The callbacks of page.evaluate() run in the widget, with its globals
-    files: ['tests/ui/**/*.mjs'],
+    files: ['tests/ui/**/*.mjs', 'tools/screenshots.mjs'],
     rules: { 'no-undef': 'off' },
   },
   {

@@ -52,7 +52,7 @@ If you want to contribute code, please follow these guidelines:
 - Make sure the project builds successfully before submitting.
 - Test your changes as much as possible before submitting.
 - Include screenshots or videos when changing the user interface.
-- Update the documentation if your change affects user-facing behavior.
+- Update the documentation if your change affects user-facing behavior, and refresh the screenshots of the README with `npm run screenshots` when it changes the interface.
 - Keep commit history reasonably clean before requesting a review.
 
 Large PRs can be harder to review and may require more time. Smaller and focused contributions are easier to review and can usually be processed faster.

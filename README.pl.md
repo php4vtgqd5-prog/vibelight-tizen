@@ -1,3 +1,5 @@
+<p align="center"><img src="res/icon.png" width="128" alt="Ikona VibeLight"></p>
+
 # VibeLight
 
 🇬🇧 [English version](README.md)
@@ -24,11 +26,33 @@ streamu, statystyki, powrót do ostatniej gry jednym przyciskiem oraz nowy inter
 - **Kontynuuj grę.** Ekran główny proponuje ostatnio streamowaną aplikację: naciśnij OK, a VibeLight
   w razie potrzeby wybudzi hosta i uruchomi aplikację. Z opcją *Wznawianie przy uruchomieniu* startuje
   sama po krótkim odliczaniu, które anulujesz przyciskiem WSTECZ.
-- **Nowy interfejs.** Ciemny motyw z wyraźnym zaznaczeniem, karty hostów pokazujące, czy host jest
-  online, ekran ładowania z okładką aplikacji i wybranymi ustawieniami, zegar w nagłówku oraz polskie
-  tłumaczenie obok angielskiego i portugalskiego.
+- **Nowoczesny interfejs.** Ciemny motyw z krojem Inter i nową ikoną, powitanie z liczbą komputerów
+  online na ekranie głównym, lista aplikacji na tle w kolorach wybranej gry, animowane karty z
+  wyraźnym zaznaczeniem, ekran ładowania z okładką aplikacji i wybranymi ustawieniami, zegar w
+  nagłówku oraz polskie tłumaczenie obok angielskiego i portugalskiego.
 - **Stabilność.** Wiele poprawek w silniku streamingu: wyścigi przy zamykaniu streamu, wycieki
   pamięci, frame pacer obciążający procesor, obsługa padów i więcej (zobacz [listę zmian](CHANGELOG.md)).
+
+## Zrzuty ekranu
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/pl/home.jpg" alt="Ekran główny z komputerami online i opcją Kontynuuj grę"><br><sub>Ekran główny z komputerami online i opcją Kontynuuj grę</sub></td>
+    <td width="50%"><img src="docs/screenshots/pl/apps.jpg" alt="Aplikacje komputera na tle w kolorach wybranej gry"><br><sub>Aplikacje komputera na tle w kolorach wybranej gry</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/pl/stream-statistics.jpg" alt="Szczegółowa nakładka statystyk, przełączana ŻÓŁTYM przyciskiem"><br><sub>Szczegółowa nakładka statystyk, przełączana ŻÓŁTYM przyciskiem</sub></td>
+    <td width="50%"><img src="docs/screenshots/pl/session-summary.jpg" alt="Ocena jakości i podsumowanie po sesji"><br><sub>Ocena jakości i podsumowanie po sesji</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/pl/auto-tune.jpg" alt="Ustawienia Auto-Tune"><br><sub>Ustawienia Auto-Tune</sub></td>
+    <td width="50%"><img src="docs/screenshots/pl/auto-tune-test.jpg" alt="Przetestuj mój zestaw: telewizor, opóźnienie i zalecane ustawienia"><br><sub>Przetestuj mój zestaw: telewizor, opóźnienie i zalecane ustawienia</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/pl/loading.jpg" alt="Ekran ładowania, gdy Auto-Tune sprawdza połączenie"><br><sub>Ekran ładowania, gdy Auto-Tune sprawdza połączenie</sub></td>
+    <td width="50%"><img src="docs/screenshots/pl/game-mode.jpg" alt="Tryb gry, który Auto włącza tylko tam, gdzie działa"><br><sub>Tryb gry, który Auto włącza tylko tam, gdzie działa</sub></td>
+  </tr>
+</table>
 
 ## Wymagania
 
@@ -108,6 +132,7 @@ npm run harness      # http://localhost:8080/
 npm run check        # lint (ES2017 dla Tizen 5.5), testy jednostkowe, pliki tłumaczeń, składnia modułu WebAssembly
 npx playwright install chromium
 npm run test:ui      # testy interfejsu w Chromium na symulatorze
+npm run screenshots  # zrzuty ekranu tej strony, zapisywane w docs/screenshots
 ```
 
 Moduł WebAssembly i aplikację buduje się narzędziami Tizen SDK i Samsung Emscripten w Dockerze:
