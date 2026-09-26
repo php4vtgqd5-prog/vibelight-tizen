@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file. VibeLight continues Moonlight
 Tizen from its version 1.17.1, whose history is kept below.
 
+## v2.0.1
+
+### Changed
+- Made the menus smoother on the TV by drawing the blurred backdrops once on a small canvas instead of blurring with CSS
+- Animated only the position and size of the cards, and removed the shine that swept across the focused card
+- Polled the gamepads only while one is connected, and skipped unchanged text updates after each host poll
+
 ## v2.0.0
 
 ### Added

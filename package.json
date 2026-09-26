@@ -1,6 +1,6 @@
 {
   "name": "vibelight-tizen",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "VibeLight: a game streaming client for Samsung Tizen TVs, based on Moonlight",
   "license": "GPL-3.0-only",
