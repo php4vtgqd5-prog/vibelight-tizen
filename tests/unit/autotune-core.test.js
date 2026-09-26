@@ -203,6 +203,24 @@ test('summarizeProbe drops the warm-up request and measures the jitter', () => {
   assert.deepEqual(AutoTune.summarizeProbe([], 3), { rttMedian: 0, rttJitter: 0, loss: 1, samples: 0 });
 });
 
+test('late probe answers from a busy TV do not lower the network class, a jittery network does', () => {
+  // Two answers delayed by a busy TV, on a wired network
+  const stalled = AutoTune.summarizeProbe([40, 3, 4, 90, 100, 3, 4], 0);
+  assert.equal(stalled.rttMedian, 4);
+  assert.ok(stalled.rttJitter < 1, 'jitter ' + stalled.rttJitter);
+  assert.equal(AutoTune.classifyNetwork({ type: 'ethernet', probe: stalled }), 'excellent');
+
+  // Half of the answers take four times longer
+  const jittery = AutoTune.summarizeProbe([40, 2, 12, 3, 14, 2, 13], 0);
+  assert.equal(jittery.rttMedian, 12);
+  assert.ok(jittery.rttJitter >= 2, 'jitter ' + jittery.rttJitter);
+  assert.equal(AutoTune.classifyNetwork({ type: 'ethernet', probe: jittery }), 'fair');
+
+  // Half of the answers are twenty times slower
+  const slow = AutoTune.summarizeProbe([40, 3, 60, 3, 70, 3, 80], 0);
+  assert.equal(AutoTune.classifyNetwork({ type: 'ethernet', probe: slow }), 'weak');
+});
+
 test('an adaptive reconnect remembers the bitrate that struggled', () => {
   const profile = AutoTune.recordPoorBitrate({ knownGoodKbps: 50000, networkType: 'wifi' }, 45000, { now: 1700000000000, networkType: 'wifi' });
   assert.equal(profile.knownBadKbps, 45000);

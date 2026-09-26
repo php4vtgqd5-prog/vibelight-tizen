@@ -434,7 +434,12 @@
     }
     var sorted = valid.slice().sort(function(a, b) { return a - b; });
     var median = sorted[Math.floor(sorted.length / 2)];
-    var deviation = valid.reduce(function(sum, time) { return sum + Math.abs(time - median); }, 0) / valid.length;
+    // The times are measured on the main thread while the interface starts the stream, so a few late
+    // answers are more likely a busy TV than the network: the largest third of the deviations is
+    // left out, while a network whose answers keep varying still raises the median or the jitter
+    var deviations = valid.map(function(time) { return Math.abs(time - median); }).sort(function(a, b) { return a - b; });
+    deviations = deviations.slice(0, deviations.length - Math.floor(deviations.length / 3));
+    var deviation = deviations.reduce(function(sum, value) { return sum + value; }, 0) / deviations.length;
     return {
       rttMedian: Math.round(median * 10) / 10,
       rttJitter: Math.round(deviation * 10) / 10,
