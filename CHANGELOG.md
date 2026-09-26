@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file. VibeLight continues Moonlight
 Tizen from its version 1.17.1, whose history is kept below.
 
+## v2.0.2
+
+### Changed
+- Filtered out the noise of the analog sticks at rest, so it no longer wakes the interface on every poll of the gamepads
+- Ran a single repeat of the held direction at a time, instead of a new loop on every change of a stick
+- Ran the checks and the UI tests before building the widgets of a release, and published tags such as v2.0.2-beta.1 as pre-releases
+
+### Fixed
+- Fixed a held D-pad direction stopping its repeat when an analog stick at rest reported a tiny change
+- Fixed a stick pushed half way moving the focus only once, as its changing value kept postponing the repeat
+- Fixed the release of a button stopping the repeat of a direction still held
+- Fixed the blurred background of the Apps view missing when the box art of the focused app loaded after it got the focus
+- Fixed a box art loaded late being painted behind the loading screen of another stream
+
 ## v2.0.1
 
 ### Changed
