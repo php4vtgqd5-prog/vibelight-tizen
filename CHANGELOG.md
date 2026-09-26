@@ -21,6 +21,7 @@ Tizen from its version 1.17.1, whose history is kept below.
 - Fixed a PC that could no longer be opened when it was chosen while its status was being refreshed
 - Fixed a pairing the host refused, as after a wrong PIN, being reported as successful
 - Fixed the error messages failing when they were shown before the interface finished loading, which left the loading of the apps unfinished
+- Fixed the Wi-Fi signal shown as NaN% in Auto-Tune on TVs whose system information reports no strength, which also made Auto-Tune treat their Wi-Fi as weak; the level of the Samsung network API is used instead
 
 ## v2.0.1
 

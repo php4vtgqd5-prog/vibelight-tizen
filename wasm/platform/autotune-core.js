@@ -80,7 +80,7 @@
     if (network.type === 'ethernet') {
       level = 3;
     } else if (network.type === 'wifi') {
-      var signal = typeof network.wifiSignal === 'number' ? network.wifiSignal : 0.6;
+      var signal = typeof network.wifiSignal === 'number' && isFinite(network.wifiSignal) ? network.wifiSignal : 0.6;
       level = signal >= 0.75 ? 2 : (signal >= 0.5 ? 1 : 0);
     } else {
       level = 1;
@@ -422,6 +422,20 @@
     return clamp(roundBitrate(currentBitrate * 0.6), MIN_BITRATE, MAX_BITRATE);
   }
 
+  // Strength of the Wi-Fi signal between 0 and 1, or null when the TV does not tell. The signal
+  // strength of Tizen is between 0 and 1, but some TVs report NaN for it. The Samsung network API
+  // then gives a level from 1 to 5, 5 being the strongest.
+  function wifiSignal(tizenStrength, samsungLevel) {
+    if (typeof tizenStrength === 'number' && isFinite(tizenStrength) && tizenStrength >= 0) {
+      // Some firmwares report a percentage instead of a share
+      return tizenStrength <= 1 ? tizenStrength : clamp(tizenStrength / 100, 0, 1);
+    }
+    if (typeof samsungLevel === 'number' && isFinite(samsungLevel) && samsungLevel >= 1 && samsungLevel <= 5) {
+      return samsungLevel / 5;
+    }
+    return null;
+  }
+
   // Round trip statistics of a series of probe times, in milliseconds
   function summarizeProbe(times, failures) {
     var valid = times.filter(function(time) { return isFinite(time) && time >= 0; });
@@ -461,6 +475,7 @@
     recordCodecFailure: recordCodecFailure,
     adaptiveReconnectBitrate: adaptiveReconnectBitrate,
     summarizeProbe: summarizeProbe,
+    wifiSignal: wifiSignal,
     hostSupports: hostSupports,
     deviceDecodes: deviceDecodes,
   };
