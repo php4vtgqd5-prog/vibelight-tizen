@@ -97,7 +97,7 @@ jobs:
           docker cp gamemode:/home/moonlight/VibeLight-GameMode.wgt .
           docker rm gamemode
       - name: Publish the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
           # A tag created by the release points to the commit that was built
