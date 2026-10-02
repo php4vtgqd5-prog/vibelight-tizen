@@ -70,7 +70,7 @@ jobs:
           sed -i "s/__BUILD_TYPE__/development/g" wasm/platform/index.js
           sed -i "s/__BUILD_COMMIT__/$(git rev-parse --short HEAD)/g" wasm/platform/index.js
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build the widget with the Tizen SDK
         uses: docker/build-push-action@v7
         with:
