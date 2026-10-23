@@ -24,7 +24,7 @@
     "check": "npm run lint && npm run test:unit && npm run i18n:check && npm run check:wasm"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.1",
     "eslint": "^10.11.0",
     "globals": "^17.12.0"
   }
